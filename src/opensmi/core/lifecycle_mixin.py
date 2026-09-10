@@ -27,7 +27,7 @@ from typing import Final, Self, TypeVar, overload
 import structlog
 
 from opensmi.core.errors import CycleError
-from opensmi.core.lifecycle import LifecycleState
+from opensmi.core.enums import LifecycleState
 from opensmi.core.mixin_helpers import get_logger
 
 _LOGGER = structlog.get_logger("open_smi." + __name__)
