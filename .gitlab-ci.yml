@@ -17,7 +17,7 @@ test:
     - apk add --no-cache git
     - python --version
     - python -m pip install --cache-dir .cache/pip --upgrade pip setuptools wheel
-    - python -m pip install --cache-dir .cache/pip ".[dev]"
+    - python -m pip install --cache-dir .cache/pip . --group dev
   script:
     - python -m pytest --timeout=120 --html=report.html --self-contained-html --junitxml=result.xml --cov=open_smi --cov-report term --cov-report xml:coverage.xml -v -n 8
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
