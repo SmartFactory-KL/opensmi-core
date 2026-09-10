@@ -4,7 +4,7 @@
 
 import pytest
 
-from open_smi_common import Signal
+from opensmi.core import Signal
 
 
 @pytest.mark.asyncio

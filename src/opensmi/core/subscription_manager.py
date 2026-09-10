@@ -17,7 +17,7 @@ from asyncua.common.subscription import DataChangeNotif, Subscription
 from asyncua.ua import NodeId, UaStatusCodeError
 from asyncua.ua.uaerrors import BadAttributeIdInvalid
 
-from open_smi_common.protocols import UaEvent
+from opensmi.core.protocols import UaEvent
 
 
 class UaDataChangeSubscriber(ABC):

@@ -11,9 +11,9 @@ from weakref import WeakValueDictionary
 
 from asyncua import ua
 
-from open_smi_common.base_ua_object import BaseUaObject
-from open_smi_common.protocols import NamespaceProvider
-from open_smi_common.ua import NodeIdDefinition
+from opensmi.core.base_ua_object import BaseUaObject
+from opensmi.core.protocols import NamespaceProvider
+from opensmi.core.ua import NodeIdDefinition
 
 _UaObjectType = TypeVar("_UaObjectType", bound=BaseUaObject)
 

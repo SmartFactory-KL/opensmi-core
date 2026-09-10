@@ -16,7 +16,7 @@ from asyncua.common.node import Node
 from asyncua.ua import QualifiedName
 from asyncua.ua.uaerrors import BadTypeMismatch
 
-from open_smi_common import Unit
+from opensmi.core import Unit
 
 NULL_NODE_ID = ua.NodeId()
 """ This node id indicates an invalid Node ID and should be treated as 'None'. """

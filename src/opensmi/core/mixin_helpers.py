@@ -8,7 +8,7 @@ from typing import Any
 
 import structlog
 
-from open_smi_common.base_ua_object import BaseUaObject
+from opensmi.core.base_ua_object import BaseUaObject
 
 
 def get_logger(obj: Any, logger: structlog.stdlib.BoundLogger) -> structlog.stdlib.BoundLogger:

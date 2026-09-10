@@ -5,7 +5,7 @@
 import pytest
 from asyncua import ua
 
-from open_smi_common import Unit
+from opensmi.core import Unit
 
 
 def test_known_centimeter():

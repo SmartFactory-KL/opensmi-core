@@ -3,7 +3,7 @@ requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "OpenSMI-Common"
+name = "OpenSMI-Core"
 dynamic = ["version"]
 
 description = "TODO"
@@ -66,6 +66,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+namespaces = true
 # exclude = ["tests", "doc*", "examples"]
 
 [tool.ruff]
@@ -129,7 +130,7 @@ author = "OpenSMI Contributors"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "D", "T", "SLF001"]
-"src/open_smi/common/unit_all.py" = ["Q000"]  # auto-generated with repr
+"src/opensmi/core/unit_all.py" = ["Q000"]  # auto-generated with repr
 
 [tool.ruff.format]
 quote-style = "double"
@@ -152,7 +153,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.mypy]
-packages = "src/open_smi_common"
+packages = "src/opensmi/core"
 
 warn_unused_configs = true
 pretty = true
@@ -165,8 +166,8 @@ typeCheckingMode = "standard"
 executionEnvironments = [{ root = "src" }]
 
 [tool.pydoctor]
-project-name = "OpenSMI-Common"
-add-package = ["src/open_smi_common"]
+project-name = "OpenSMI-Cor"
+add-package = ["src/opensmi/core"]
 docformat = "restructuredtext"
 theme = "readthedocs"
 # verbose = 1
