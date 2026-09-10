@@ -59,6 +59,7 @@ dev = [
     "pytest-xdist>=3",
     "pytest-html>=4",
     "pytest-timeout>=2",
+    "openpyxl"  # to load UNECE Excel to autogenerate units
 ]
 
 [tool.setuptools]
@@ -130,7 +131,11 @@ author = "OpenSMI Contributors"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "D", "T", "SLF001"]
-"src/opensmi/core/unit_all.py" = ["Q000"]  # auto-generated with repr
+"src/opensmi/core/unit_all.py" = [ # auto-generated
+    "E501",  # line too long
+    "RUF001",  # String contains ambiguous ~
+    "CPY",  # copyright
+]
 
 [tool.ruff.format]
 quote-style = "double"
