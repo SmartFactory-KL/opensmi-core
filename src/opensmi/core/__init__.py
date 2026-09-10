@@ -18,4 +18,4 @@ from .ua_enums import MachineryOperationMode as MachineryOperationMode
 from .ua_enums import SkillState as SkillState
 from .unit_all import Unit as Unit
 
-__version__ = metadata.version("OpenSMI-Common")
+__version__ = metadata.version("OpenSMI-Core")
