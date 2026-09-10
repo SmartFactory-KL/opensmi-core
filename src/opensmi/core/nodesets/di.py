@@ -11,8 +11,8 @@ from typing import ClassVar, final
 
 from asyncua import ua
 
-from open_smi_common.frozen import FrozenMeta
-from open_smi_common.ua import NodeIdDefinition
+from ..frozen import FrozenMeta
+from ..ua import NodeIdDefinition
 
 
 @final
