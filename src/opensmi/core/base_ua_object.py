@@ -13,7 +13,7 @@ from structlog.stdlib import BoundLogger
 from typing_extensions import deprecated
 
 if TYPE_CHECKING:
-    from opensmi.common.base_server import BaseServer
+    from opensmi.core.base_server import BaseServer
 
 _ServerType = TypeVar("_ServerType", bound="BaseServer")
 
