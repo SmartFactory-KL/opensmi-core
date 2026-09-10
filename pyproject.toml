@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "OpenSMI-Core"
 dynamic = ["version"]
 
-description = "TODO"
+description = "Smart Machine Interface core functionality for server and client applications."
 authors = [
     { name = "Carsten Harms", email = "Carsten.Harms@dfki.de" },
     { name = "Simon Jungbluth", email = "Simon.Jungbluth@smartfactory.de" },
@@ -171,7 +171,7 @@ typeCheckingMode = "standard"
 executionEnvironments = [{ root = "src" }]
 
 [tool.pydoctor]
-project-name = "OpenSMI-Cor"
+project-name = "OpenSMI-Core"
 add-package = ["src/opensmi/core"]
 docformat = "restructuredtext"
 theme = "readthedocs"
