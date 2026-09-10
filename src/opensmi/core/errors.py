@@ -56,7 +56,7 @@ class ValidationError(ValueError):
 
 
 class CycleError(Exception):
-    """Raised when a dependency graph of ``@resource`` decorated methods contains a cycle.
+    """Raised when a dependency graph of ``@lifecycle`` decorated methods contains a cycle.
 
     See `LifecycleMixin` for more details.
     """

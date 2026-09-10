@@ -44,7 +44,7 @@ class BaseUaObject(Generic[_ServerType]):
         self._server: _ServerType | None = server
         self._ua_node: Node | None = None
         self._logger: structlog.BoundLogger = structlog.get_logger(
-            f"open_smi.{self.__class__.__name__}", name=self.name
+            f"opensmi.{self.__class__.__name__}", name=self.name
         )
 
         super().__init__(**kwargs)  # cooperative __init__() after we are done

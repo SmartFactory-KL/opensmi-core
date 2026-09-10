@@ -56,7 +56,7 @@ class SubscriptionManager:
         self.period: float = 100
         """Publishing interval in milliseconds for OPC UA subscription."""
 
-        self.logger = structlog.getLogger("open_smi.SubscriptionManager")
+        self.logger = structlog.getLogger("opensmi.SubscriptionManager")
 
     async def _create_subscription(self, ua_client: Client):
         self._ua_subscription = await ua_client.create_subscription(period=self.period, handler=self)
