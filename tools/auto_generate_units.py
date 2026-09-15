@@ -108,7 +108,7 @@ def _parse(path: Path) -> dict[str, _UneceUnit]:
 
             unit = _UneceUnit(
                 name=name,
-                symbol=str(symbol),
+                symbol=str(symbol).replace("\xa0", " ").strip(),  # replace non-breaking space with space,
                 common_code=str(common_code),
                 level=str(level),
             )
