@@ -21,6 +21,8 @@ from opensmi.core import Unit
 NULL_NODE_ID = ua.NodeId()
 """ This node id indicates an invalid Node ID and should be treated as 'None'. """
 
+_LOGGER = structlog.getLogger(__name__)
+
 
 async def read_value(node: Node) -> Any:
     """Read the value of the given node and transforms the NULL_NODE_ID into None."""
@@ -126,17 +128,22 @@ async def get_properties(node: Node, *, logger: structlog.stdlib.BoundLogger | N
     return result
 
 
-async def get_type_definition(ua_node: Node) -> str:
-    """Return the browse name of the OPC UA type definition of the given node."""
-    try:
-        type_definition_list = await ua_node.get_references(
-            ua.object_ids.ObjectIds.HasTypeDefinition,
-            ua.BrowseDirection.Forward,
-        )
+async def get_type_definition(ua_node: Node, *, default: str = "UNKNOWN") -> str:
+    """Return the browse name of the OPC UA type definition of the given node.
+
+    :param ua_node: OPC UA node to operate on.
+    :param default: Default value to return if type definition cannot be determined.
+    """
+    assert ua_node is not None, "No node node given!"
+    type_definition_list = await ua_node.get_references(
+        ua.object_ids.ObjectIds.HasTypeDefinition,
+        ua.BrowseDirection.Forward,
+    )
+    if len(type_definition_list) > 0:
         return type_definition_list[0].BrowseName.Name
-    except Exception as ex:
-        msg = f"Could not find type definition for node {ua_node.nodeid.to_string()}!"
-        raise RuntimeError(msg) from ex
+
+    _LOGGER.warning("Could not determine type definition!", ua_node = ua_node.nodeid.to_string(), default=default)
+    return default
 
 
 def get_node_id(
