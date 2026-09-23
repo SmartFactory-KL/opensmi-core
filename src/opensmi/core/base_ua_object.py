@@ -21,11 +21,14 @@ _ServerType = TypeVar("_ServerType", bound="BaseServer")
 class BaseUaObject(Generic[_ServerType]):
     """Base class for all UA objects, both client- and server-side."""
 
+    _parent: "BaseUaObject[_ServerType] | None" = None
+
     def __init__(
         self,
         *,
         name: str | None = None,
         server: _ServerType | None = None,
+        parent: "BaseUaObject[_ServerType] | None" = None,
         **kwargs,
     ) -> None:
         """*Cooperative* constructor.
@@ -33,6 +36,8 @@ class BaseUaObject(Generic[_ServerType]):
         :param name: The name of the UA object. Defaults to the class name.
         :param server: The associated server of the UA object. Note that there must be at least one non ``None`` in
             the hierarchy.
+        :param parent: The parent of the UA object. Only Machines are allowed to have no parent. Can be set later before
+            asynchronous initialization.
         """
         if name is None:
             name = self.__class__.__name__
@@ -42,6 +47,8 @@ class BaseUaObject(Generic[_ServerType]):
 
         self._name: str = name
         self._server: _ServerType | None = server
+        if parent is not None:
+            self.parent = parent  # via setter to allow optional runtime type checking
         self._ua_node: Node | None = None
         self._logger: structlog.BoundLogger = structlog.get_logger(
             f"opensmi.{self.__class__.__name__}", name=self.name
@@ -76,22 +83,34 @@ class BaseUaObject(Generic[_ServerType]):
     @property
     @deprecated("Use path instead")
     def full_name(self) -> str:
-        parent = getattr(self, "parent", None)
-        if isinstance(parent, BaseUaObject):
-            return f"{parent.full_name}/{self.name}"
+        if self.parent is not None:
+            assert isinstance(self.parent, BaseUaObject)
+            return f"{self.parent.full_name}/{self.name}"
         return f"/{self.name}"
 
     @property
     def path(self) -> PurePosixPath:
         """Return the full path of the object."""
-        if isinstance(parent := getattr(self, "parent", None), BaseUaObject):
-            return parent.path / self.name
+        if self.parent is not None:
+            assert isinstance(self.parent, BaseUaObject)
+            return self.parent.path / self.name
         return PurePosixPath("/") / self.name
 
     @property
     def logger(self) -> BoundLogger:
         """Logger associated with the `UaObject` instance."""
         return self._logger  # type: ignore
+
+    @property
+    def parent(self) -> "BaseUaObject[_ServerType] | None":
+        """Return the untyped parent of the UA object."""
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent: "BaseUaObject[_ServerType]") -> None:
+        """Set the parent of the UA object. Given ``parent`` must be an instance of `BaseUaObject`."""
+        assert isinstance(parent, BaseUaObject)
+        self._parent = parent
 
     # TODO
     # @override
