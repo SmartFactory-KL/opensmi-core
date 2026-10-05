@@ -65,7 +65,7 @@ async def write_value(node: Node, value: Any, *, variant_type: ua.VariantType | 
     try:
         if isinstance(value, ua.Variant):
             await _write_value(node, value, variant_type=value.VariantType)
-        if variant_type is not None:
+        elif variant_type is not None:
             await _write_value(node, value, variant_type=variant_type)
         else:
             # we need to figure out the correct variant type to use ourselves
