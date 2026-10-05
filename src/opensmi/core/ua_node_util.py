@@ -178,16 +178,29 @@ def get_node_id(
     return ua.NodeId(Identifier=identifier, NamespaceIndex=ua.Int16(ns_idx))
 
 
-async def get_child_without_ns(parent: Node, *, display_name: str) -> Node:
-    """Return the first child node with given display name while ignoring the namespace index.
+async def get_child_without_ns(parent: Node, *, browse_name: str | None = None, display_name: str | None = None) -> Node:
+    """Return the first child node with given ``browse_name`` or ``display_name`` while ignoring namespaces.
 
-    :raises BadNoMatch: If no child with given display name exists.
+    For each child, ``BrowseName`` is matched first, ``DisplayName`` afterward. If both are given, a child matching
+    either one is returned.
+
+    :param parent: OPC UA parent node.
+    :param browse_name: OPC UA ``BrowseName.Name`` content to compare against. ``NamespaceIndex`` is ignored.
+    :param display_name: OPC UA ``DisplayName.Text`` content to compare against. ``Locale`` is ignored.
+
+    :raises ValueError: If neither ``browse_name`` nor ``display_name`` is given.
+    :raises BadNoMatch: If no child with given browse name or display name was found.
     """
-    for child in await parent.get_children():
-        child_display_name = (await child.read_display_name()).Text
-        # print(parent.nodeid.to_string(), display_name, child_display_name)
-        if child_display_name == display_name:
-            return child
+    if browse_name is None and display_name is None:
+        msg = "Either browse_name or display_name must be set"
+        raise ValueError(msg)
+
+    for ref in await parent.get_children_descriptions():
+        if browse_name is not None and ref.BrowseName.Name == browse_name:
+            return Node(session=parent.session, nodeid=ref.NodeId)
+        if display_name is not None and ref.DisplayName.Text == display_name:
+            return Node(session=parent.session, nodeid=ref.NodeId)
+
     raise ua.uaerrors.BadNoMatch
 
 
