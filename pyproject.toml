@@ -5,12 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "OpenSMI-Core"
 dynamic = ["version"]
-
+readme = "README.md"
 description = "Smart Machine Interface core functionality for server and client applications."
 authors = [
     { name = "Carsten Harms", email = "Carsten.Harms@dfki.de" },
     { name = "Simon Jungbluth", email = "Simon.Jungbluth@smartfactory.de" },
 ]
+license = "MIT"
+license-files = ["LICENSES/MIT.txt"]
 
 # see https://pypi.org/classifiers/
 classifiers = [
