@@ -4,10 +4,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import time
 from abc import ABC, abstractmethod
+from asyncio import Task
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Never
 
 import structlog
 from asyncua import ua
@@ -46,49 +49,74 @@ class SubscriptionManager:
     _ua_client: Client
     _ua_subscription: Subscription
 
-    def __init__(self) -> None:
-        """Create a new instance."""
+    def __init__(
+        self,
+        *,
+        ua_client: Client,
+        publishing_interval_ms: float = 100,
+        heartbeat_stale_after: float = 10.0,
+    ) -> None:
+        """Create a new instance.
+
+        :param ua_client: OPC UA client to use.
+        :param publishing_interval_ms: Publishing interval in milliseconds for OPC UA subscription
+        :param heartbeat_stale_after: Time in seconds until any subscription should be received.
+        """
+        self._publishing_interval_ms = publishing_interval_ms
+        self._ua_client = ua_client
+
         self._data_subscription_map: dict[NodeId, list[UaDataChangeSubscriber]] = {}
         """ Maps a OPC UA node to a list of handlers for data change notifications. """
         self._event_subscription_map: dict[NodeId, list[UaEventSubscriber]] = {}
         """ Maps a OPC UA node to a list of handlers for event notifications. """
 
-        self.period: float = 100
-        """Publishing interval in milliseconds for OPC UA subscription."""
+        self._heartbeat_task: Task[Never] | None = None
+        self._last_heartbeat = time.monotonic()
+        self._heartbeat_stale_after = heartbeat_stale_after
 
         self.logger = structlog.getLogger("opensmi.SubscriptionManager")
 
-    async def _create_subscription(self, ua_client: Client):
-        self._ua_subscription = await ua_client.create_subscription(period=self.period, handler=self)
+    async def _create_subscription(self) -> None:
+        self._ua_subscription = await self._ua_client.create_subscription(
+            period=self._publishing_interval_ms, handler=self
+        )
         self.logger.info("Created subscription!", parameters=self._ua_subscription.parameters)
 
-    async def init(self, ua_client: Client, period: float = 100) -> None:
-        self.period = period
-        self._ua_client = ua_client
-        await self._create_subscription(ua_client)
+    async def init(self) -> None:
+        await self._create_subscription()
 
         # subscribe to a node that always changes reliably, for example the current time of the server
         # this is done to prevent the subscription from timing out
-        current_time_node = ua_client.get_node(ua.object_ids.ObjectIds.Server_ServerStatus_CurrentTime)
+        current_time_node = self._ua_client.get_node(ua.object_ids.ObjectIds.Server_ServerStatus_CurrentTime)
         await self.subscribe_data_change(self, current_time_node)  # pyright: ignore[reportArgumentType]
 
-    # async def renew_subscriptions(self, ua_client: Client) -> None:
-    #     self.logger.info(f"Renewing {self.no_of_monitored_items} subscriptions...")
-    #     old_data_subscription_map = self._data_subscription_map.copy()
-    #     old_event_subscription_map = self._event_subscription_map.copy()
-    #
-    #     await self.clear_subscriptions()
-    #     await self._create_subscription(ua_client)
-    #
-    #     # add all old data change subscriptions back
-    #     for node_id, handlers in old_data_subscription_map.items():
-    #         for handler in handlers:
-    #             await self.subscribe_data_change(handler=handler, nodes=[ua_client.get_node(node_id)])
-    #
-    #     # add all old event subscriptions back
-    #     for node_id, handlers in old_event_subscription_map.items():
-    #         for handler in handlers:
-    #             await self.subscribe_event(handler=handler, source_node=node_id)
+        self._last_heartbeat = time.monotonic()
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(), name="heartbeat_task")
+
+    async def _renew_subscriptions(self) -> None:
+        self.logger.info(f"Trying to renew {self.no_of_monitored_items} subscriptions...")
+        old_data_subscription_map = self._data_subscription_map.copy()
+        old_event_subscription_map = self._event_subscription_map.copy()
+
+        await self.clear_subscriptions()
+        while True:
+            try:
+                await self._create_subscription()
+                # add all old data change subscriptions back
+                for node_id, handlers in old_data_subscription_map.items():
+                    for handler in handlers:
+                        await self.subscribe_data_change(handler=handler, nodes=[self._ua_client.get_node(node_id)])
+
+                # add all old event subscriptions back
+                for node_id, handlers in old_event_subscription_map.items():
+                    for handler in handlers:
+                        await self.subscribe_event(handler=handler, source_node=node_id)
+
+                self.logger.info("Successfully renewed subscriptions")
+                break
+            except Exception as err:
+                self.logger.warning("Could not renew subscriptions!", reason=err)
+                await asyncio.sleep(1)
 
     async def clear_subscriptions(self) -> None:
         self.logger.info(f"Clearing {self.no_of_monitored_items} subscriptions...")
@@ -160,11 +188,24 @@ class SubscriptionManager:
         await self._ua_subscription.subscribe_events(sourcenode=source_node)
         self._event_subscription_map[node_id].append(handler)
 
+    async def _heartbeat_loop(self) -> Never:
+        while True:
+            await asyncio.sleep(self._heartbeat_stale_after / 4)
+            try:
+                stale_for = time.monotonic() - self._last_heartbeat
+                if stale_for > self._heartbeat_stale_after:
+                    self.logger.warning("Heartbeat stale, subscriptions presumed dead", stale_for=stale_for)
+                    await self._renew_subscriptions()
+            except Exception as err:
+                self.logger.warning("Heartbeat check failed", reason=err)
+
     ###########################################
     # asyncua callbacks
 
     async def datachange_notification(self, node: Node, val: Any, data: DataChangeNotif) -> None:
         """Handle OPC UA data change notifications callback."""
+        self._last_heartbeat = time.monotonic()
+
         try:
             for handler in self._data_subscription_map[node.nodeid]:  # list of handlers
                 if handler == self:
@@ -181,6 +222,8 @@ class SubscriptionManager:
 
     async def event_notification(self, ua_event: UaEvent) -> None:
         """Handle OPC UA event notifications callback."""
+        self._last_heartbeat = time.monotonic()
+
         # TODO(CaHa): ua_event.emitting_node is always i=2253 (=Server)
         # might be an asyncua problem
         try:
