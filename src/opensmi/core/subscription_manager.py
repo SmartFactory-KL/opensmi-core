@@ -87,6 +87,9 @@ class SubscriptionManager:
 
         Must be called once before any ``subscribe_*`` method.
         """
+        if self._heartbeat_task is not None:
+            return
+
         await self._create_subscription()
 
         # subscribe to a node that always changes reliably, for example the current time of the server
