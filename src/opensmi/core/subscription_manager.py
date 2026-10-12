@@ -43,7 +43,7 @@ class SubscriptionManager:
     """Centrally manages all OPC UA subscription needs.
 
     It bundles subscriptions using only one subscription to an OPC UA server
-    to not stay within max. subscription limits of certain OPC UA servers.
+    to stay within max. subscription limits of certain OPC UA servers.
     """
 
     _ua_client: Client
@@ -83,6 +83,10 @@ class SubscriptionManager:
         self.logger.info("Created subscription!", parameters=self._ua_subscription.parameters)
 
     async def init(self) -> None:
+        """Create the subscription and start heartbeat monitoring.
+
+        Must be called once before any ``subscribe_*`` method.
+        """
         await self._create_subscription()
 
         # subscribe to a node that always changes reliably, for example the current time of the server
@@ -132,6 +136,7 @@ class SubscriptionManager:
                 await asyncio.sleep(1)
 
     async def clear_subscriptions(self) -> None:
+        """Delete the OPC UA subscription and forget all registered handlers."""
         self.logger.info(f"Clearing {self.no_of_monitored_items} subscriptions...")
         try:
             await self._ua_subscription.delete()
