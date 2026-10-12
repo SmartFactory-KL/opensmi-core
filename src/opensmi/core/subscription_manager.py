@@ -92,6 +92,19 @@ class SubscriptionManager:
 
         self._last_heartbeat = time.monotonic()
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(), name="heartbeat_task")
+        self.logger.info("Subscription manager initialized")
+
+    async def shutdown(self) -> None:
+        """Stop heartbeat monitoring and delete the OPC UA subscription."""
+        # Stop the heartbeat first, so it can't start renewing subscriptions while shutting down
+        if self._heartbeat_task is not None:
+            self._heartbeat_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._heartbeat_task
+            self._heartbeat_task = None
+
+        await self.clear_subscriptions()
+        self.logger.info("Subscription manager shut down")
 
     async def _renew_subscriptions(self) -> None:
         self.logger.info(f"Trying to renew {self.no_of_monitored_items} subscriptions...")
