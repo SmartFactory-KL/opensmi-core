@@ -21,6 +21,7 @@ reverse order. Order is resolved once, in `LifecycleMixin.__init_subclass__`, fr
 import graphlib
 import inspect
 import time
+from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Callable
 from typing import Final, Self, TypeVar, overload
 
@@ -143,7 +144,10 @@ class LifecycleMixin:
                 started.append(func)
                 get_logger(self, _LOGGER).debug("started successfully", func=func.__qualname__)
         except BaseException as init_exception:
-            get_logger(self, _LOGGER).exception("Failed to initialize!")
+            if isinstance(init_exception, CancelledError):
+                get_logger(self, _LOGGER).error("Initialization cancelled")
+            else:
+                get_logger(self, _LOGGER).exception("Failed to initialize!")
             self.__state = LifecycleState.INITIALIZATION_FAILED
             rollback_exceptions: list[Exception] = await self.__shutdown(started)
             if rollback_exceptions:
