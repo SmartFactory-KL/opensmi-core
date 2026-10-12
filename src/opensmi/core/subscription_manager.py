@@ -10,7 +10,8 @@ import time
 from abc import ABC, abstractmethod
 from asyncio import Task
 from collections.abc import Iterable
-from typing import Any, Never
+from dataclasses import dataclass, field
+from typing import Any, Generic, Never, TypeVar
 
 import structlog
 from asyncua import ua
@@ -39,6 +40,15 @@ class UaEventSubscriber(ABC):
         """Handle OPC UA event notification."""
 
 
+_HandlerType = TypeVar("_HandlerType")
+
+
+@dataclass
+class _MonitoredItem(Generic[_HandlerType]):
+    handle: int
+    handlers: list[_HandlerType] = field(default_factory=list)
+
+
 class SubscriptionManager:
     """Centrally manages all OPC UA subscription needs.
 
@@ -65,10 +75,10 @@ class SubscriptionManager:
         self._publishing_interval_ms = publishing_interval_ms
         self._ua_client = ua_client
 
-        self._data_subscription_map: dict[NodeId, list[UaDataChangeSubscriber]] = {}
-        """ Maps a OPC UA node to a list of handlers for data change notifications. """
-        self._event_subscription_map: dict[NodeId, list[UaEventSubscriber]] = {}
-        """ Maps a OPC UA node to a list of handlers for event notifications. """
+        self._data_subscription_map: dict[NodeId, _MonitoredItem[UaDataChangeSubscriber]] = {}
+        """ Maps a OPC UA node to a handle and a list of handlers for data change notifications. """
+        self._event_subscription_map: dict[NodeId, _MonitoredItem[UaEventSubscriber]] = {}
+        """ Maps a OPC UA node to a handle and a list of handlers for event notifications. """
 
         self._heartbeat_task: Task[Never] | None = None
         self._last_heartbeat = time.monotonic()
@@ -123,13 +133,13 @@ class SubscriptionManager:
             try:
                 await self._create_subscription()
                 # add all old data change subscriptions back
-                for node_id, handlers in old_data_subscription_map.items():
-                    for handler in handlers:
+                for node_id, monitored_item in old_data_subscription_map.items():
+                    for handler in monitored_item.handlers:
                         await self.subscribe_data_change(handler=handler, nodes=[self._ua_client.get_node(node_id)])
 
                 # add all old event subscriptions back
-                for node_id, handlers in old_event_subscription_map.items():
-                    for handler in handlers:
+                for node_id, monitored_item in old_event_subscription_map.items():
+                    for handler in monitored_item.handlers:
                         await self.subscribe_event(handler=handler, source_node=node_id)
 
                 self.logger.info("Successfully renewed subscriptions")
@@ -174,11 +184,12 @@ class SubscriptionManager:
                 node = self._ua_client.get_node(node)
 
             if node.nodeid not in self._data_subscription_map:
-                self._data_subscription_map[node.nodeid] = []
                 try:
-                    await self._ua_subscription.subscribe_data_change(node)
-                    self._data_subscription_map[node.nodeid].append(handler)
-                    self.logger.debug("Added data change handler", handler=handler, node=node.nodeid.to_string())
+                    handle = await self._ua_subscription.subscribe_data_change(node)
+                    self._data_subscription_map[node.nodeid] = _MonitoredItem(handle=handle, handlers=[handler])
+                    self.logger.debug(
+                        "Added data change handler", handler=handler, node=node.nodeid.to_string(), handle=handle
+                    )
                 except BadAttributeIdInvalid:
                     self.logger.warning("Node does not support subscription!", node=node.nodeid.to_string())
                 except UaStatusCodeError as err:
@@ -190,7 +201,7 @@ class SubscriptionManager:
                     handler=handler,
                     node=node.nodeid.to_string(),
                 )
-                self._data_subscription_map[node.nodeid].append(handler)
+                self._data_subscription_map[node.nodeid].handlers.append(handler)
 
     async def subscribe_event(self, handler: UaEventSubscriber, source_node: Node | NodeId) -> None:
         """Add given handler to receive event notifications for given node."""
@@ -204,10 +215,53 @@ class SubscriptionManager:
             raise TypeError(msg)
 
         if node_id not in self._event_subscription_map:
-            self._event_subscription_map[node_id] = []
+            handle = await self._ua_subscription.subscribe_events(sourcenode=source_node)
+            self._event_subscription_map[node_id] = _MonitoredItem(handle=handle, handlers=[handler])
+            self.logger.debug("Added event handler", handler=handler, node=node_id.to_string(), handle=handle)
+        else:
+            # We only need 1 subscription for n handlers.
+            self.logger.debug(
+                "Added event handler, reusing existing subscription.", handler=handler, node=node_id.to_string()
+            )
+            self._event_subscription_map[node_id].handlers.append(handler)
 
-        await self._ua_subscription.subscribe_events(sourcenode=source_node)
-        self._event_subscription_map[node_id].append(handler)
+    async def unsubscribe_data_change(
+        self, handler: UaDataChangeSubscriber, nodes: Node | NodeId | Iterable[Node | NodeId]
+    ) -> None:
+        """Remove handler for given nodes; removes server subscription once it has no handlers left."""
+        if not isinstance(nodes, Iterable):
+            nodes = [nodes]
+
+        for node in nodes:
+            node_id = node.nodeid if isinstance(node, Node) else node
+            await self._unsubscribe(handler=handler, node_id=node_id, subscription_map=self._data_subscription_map)
+
+    async def unsubscribe_event(self, handler: UaEventSubscriber, source_node: Node | NodeId) -> None:
+        """Remove handler for events of given node; removes server subscription once it has no handlers left."""
+        node_id = source_node.nodeid if isinstance(source_node, Node) else source_node
+        await self._unsubscribe(handler=handler, node_id=node_id, subscription_map=self._event_subscription_map)
+
+    async def _unsubscribe(
+        self,
+        *,
+        handler: _HandlerType,
+        node_id: NodeId,
+        subscription_map: dict[NodeId, _MonitoredItem[_HandlerType]],
+    ) -> None:
+        item = subscription_map.get(node_id)
+        if item is None or handler not in item.handlers:
+            return  # nothing to do
+
+        item.handlers.remove(handler)
+
+        if len(item.handlers) > 0:
+            return  # other handlers still need the monitored item
+
+        del subscription_map[node_id]
+        try:
+            await self._ua_subscription.unsubscribe(item.handle)
+        except (UaStatusCodeError, ConnectionError) as err:
+            self.logger.warning("Could not delete monitored item", node=node_id.to_string(), reason=err)
 
     async def _heartbeat_loop(self) -> Never:
         while True:
@@ -227,15 +281,20 @@ class SubscriptionManager:
         """Handle OPC UA data change notifications callback."""
         self._last_heartbeat = time.monotonic()
 
-        try:
-            for handler in self._data_subscription_map[node.nodeid]:  # list of handlers
-                if handler == self:
-                    continue  # current time, not required for anything specific
-                await handler.ua_on_data_change(node, val, data)
-        except KeyError:
+        item = self._data_subscription_map.get(node.nodeid)
+        if item is None:
             self.logger.warning(
                 "Received DataChange Notification with no handlers", key=node.nodeid.to_string(), value=val
             )
+            return
+
+        for handler in list(item.handlers):  # copy, to guard against unsubscription during iteration
+            if handler is self:
+                continue  # current time, not required for anything specific
+            try:
+                await handler.ua_on_data_change(node, val, data)
+            except Exception as err:
+                self.logger.warning("Data change handler failed", handler=handler, reason=err)
 
     async def status_change_notification(self, status: ua.StatusChangeNotification) -> None:
         """Handle OPC UA status notifications callback."""
@@ -247,8 +306,13 @@ class SubscriptionManager:
 
         # TODO(CaHa): ua_event.emitting_node is always i=2253 (=Server)
         # might be an asyncua problem
-        try:
-            for handler in self._event_subscription_map[ua_event.SourceNode]:
-                await handler.ua_on_event(ua_event)
-        except KeyError:
+        item = self._event_subscription_map.get(ua_event.SourceNode)
+        if item is None:
             self.logger.warning("Received Event Notification with no handlers", ua_event=ua_event)
+            return
+
+        for handler in list(item.handlers):  # copy, to guard against unsubscription during iteration
+            try:
+                await handler.ua_on_event(ua_event)
+            except Exception as err:
+                self.logger.warning("Event handler failed", handler=handler, reason=err)
