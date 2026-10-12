@@ -182,7 +182,7 @@ class SubscriptionManager:
             msg = f"Given source_node {source_node} is not supported!"
             raise TypeError(msg)
 
-        if source_node not in self._event_subscription_map:
+        if node_id not in self._event_subscription_map:
             self._event_subscription_map[node_id] = []
 
         await self._ua_subscription.subscribe_events(sourcenode=source_node)
