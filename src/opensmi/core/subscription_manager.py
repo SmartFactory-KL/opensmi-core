@@ -45,7 +45,8 @@ _HandlerType = TypeVar("_HandlerType")
 
 @dataclass
 class _MonitoredItem(Generic[_HandlerType]):
-    handle: int
+    handle: int | None
+    """Handle as returned by ``asyncua``. Is ``None`` when renew failed."""
     handlers: list[_HandlerType] = field(default_factory=list)
 
 
@@ -123,47 +124,66 @@ class SubscriptionManager:
         await self.clear_subscriptions()
         self.logger.info("Subscription manager shut down")
 
-    async def _renew_subscriptions(self) -> None:
-        self.logger.info(f"Trying to renew {self.no_of_monitored_items} subscriptions...")
-        old_data_subscription_map = self._data_subscription_map.copy()
-        old_event_subscription_map = self._event_subscription_map.copy()
+    # TODO(CaHa): What about the subscriptions that could not be renewed?
 
-        await self.clear_subscriptions()
+    async def _renew_data_change_subscriptions(self) -> None:
+        for node_id, monitored_item in list(self._data_subscription_map.items()):
+            try:
+                handle = await self._ua_subscription.subscribe_data_change(self._ua_client.get_node(node_id))
+                monitored_item.handle = handle
+            except UaStatusCodeError as err:
+                monitored_item.handle = None
+                self.logger.warning("Could not renew data change subscription", node=node_id.to_string(), reason=err)
+
+    async def _renew_event_subscriptions(self) -> None:
+        for node_id, monitored_item in list(self._event_subscription_map.items()):
+            try:
+                handle = await self._ua_subscription.subscribe_events(node_id)
+                monitored_item.handle = handle
+            except UaStatusCodeError as err:
+                monitored_item.handle = None
+                self.logger.warning("Could not renew event subscription", node=node_id.to_string(), reason=err)
+
+    async def _renew_subscriptions(self) -> None:
+        self.logger.info("Trying to renew subscriptions...", count=self.no_of_monitored_items)
+        await self._delete_subscription()
+
         while True:
             try:
                 await self._create_subscription()
-                # add all old data change subscriptions back
-                for node_id, monitored_item in old_data_subscription_map.items():
-                    for handler in monitored_item.handlers:
-                        await self.subscribe_data_change(handler=handler, nodes=[self._ua_client.get_node(node_id)])
-
-                # add all old event subscriptions back
-                for node_id, monitored_item in old_event_subscription_map.items():
-                    for handler in monitored_item.handlers:
-                        await self.subscribe_event(handler=handler, source_node=node_id)
-
+                await self._renew_data_change_subscriptions()
+                await self._renew_event_subscriptions()
+                self._last_heartbeat = time.monotonic()
                 self.logger.info("Successfully renewed subscriptions")
                 break
             except Exception as err:
                 self.logger.warning("Could not renew subscriptions!", reason=err)
+                await self._delete_subscription()
                 await asyncio.sleep(1)
 
-    async def clear_subscriptions(self) -> None:
-        """Delete the OPC UA subscription and forget all registered handlers."""
-        self.logger.info(f"Clearing {self.no_of_monitored_items} subscriptions...")
+    def _invalidate_subscription_handles(self) -> None:
+        for item in self._data_subscription_map.values():
+            item.handle = None
+        for item in self._event_subscription_map.values():
+            item.handle = None
+
+    async def _delete_subscription(self) -> None:
+        """Best-effort deletion of the server-side subscription; the maps are left untouched."""
+        self._invalidate_subscription_handles()
         try:
             await self._ua_subscription.delete()
             self.logger.info("Deleted main OPC UA subscription!")
-        except ConnectionError:
-            pass  # we can safely ignore it since is no longer relevant
-        except AttributeError:
-            pass  # we can safely ignore it since there is no subscription to delete
+        except (ConnectionError, AttributeError):
+            pass  # connection is gone or there is no subscription to delete
         except Exception as err:
             self.logger.exception("Could not delete main OPC UA subscription!", reason=err)
-
         with contextlib.suppress(NameError, AttributeError):
             del self._ua_subscription
 
+    async def clear_subscriptions(self) -> None:
+        """Delete the OPC UA subscription and forget all registered handlers."""
+        self.logger.info("Clearing subscriptions...", count=self.no_of_monitored_items)
+        await self._delete_subscription()
         self._data_subscription_map.clear()
         self._event_subscription_map.clear()
 
@@ -258,6 +278,9 @@ class SubscriptionManager:
             return  # other handlers still need the monitored item
 
         del subscription_map[node_id]
+        if item.handle is None:
+            return  # nothing to unsubscribe
+
         try:
             await self._ua_subscription.unsubscribe(item.handle)
         except (UaStatusCodeError, ConnectionError) as err:
