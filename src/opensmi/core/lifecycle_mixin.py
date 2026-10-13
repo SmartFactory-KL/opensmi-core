@@ -47,7 +47,7 @@ _FuncOrFuncs = _Func | tuple[_Func, ...] | list[_Func]
 def lifecycle(_func: _LifecycleFunc) -> _LifecycleFunc: ...
 @overload
 def lifecycle(
-    _func: None = None, *, after: _FuncOrFuncs = (), before: _FuncOrFuncs = ()
+    _func: None = None, *, after: _FuncOrFuncs = (), before: _FuncOrFuncs = (), requires: _FuncOrFuncs = ()
 ) -> Callable[[_LifecycleFunc], _LifecycleFunc]: ...
 def lifecycle(
     _func: _LifecycleFunc | None = None,
@@ -256,7 +256,7 @@ def _build_edges(funcs: set[_Func]) -> dict[_Func, set[_Func]]:
 
     for func in funcs:
         # hard requirement: target must be present
-        required_funcs: tuple[type, ...] = getattr(func, _ATTR_LIFECYCLE_REQUIRES, ())
+        required_funcs: tuple[_Func, ...] = getattr(func, _ATTR_LIFECYCLE_REQUIRES, ())
         for dep in required_funcs:
             if dep not in funcs:
                 msg = (
@@ -266,12 +266,12 @@ def _build_edges(funcs: set[_Func]) -> dict[_Func, set[_Func]]:
                 raise TypeError(msg)
 
         # soft hint: only wire the edge if the target actually ended up present
-        after_funcs: tuple[type, ...] = getattr(func, _ATTR_LIFECYCLE_AFTER, ())
+        after_funcs: tuple[_Func, ...] = getattr(func, _ATTR_LIFECYCLE_AFTER, ())
         for after_func in after_funcs:
             if after_func in funcs:
                 edges[func].add(after_func)
 
-        before_funcs: tuple[type, ...] = getattr(func, _ATTR_LIFECYCLE_BEFORE, ())
+        before_funcs: tuple[_Func, ...] = getattr(func, _ATTR_LIFECYCLE_BEFORE, ())
         for before_func in before_funcs:
             if before_func in funcs:
                 edges[before_func].add(func)
