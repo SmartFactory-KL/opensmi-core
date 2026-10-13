@@ -32,7 +32,7 @@ def _elapsed_to_ms(_, __, event_dict: MutableMapping[str, Any]) -> MutableMappin
 
 
 _logging_initialized = False
-""" Global flag indicated whether logging is initialized. """
+"""Global flag indicated whether logging is initialized."""
 
 
 class LogFormat(Enum):
@@ -46,11 +46,15 @@ class LogFormat(Enum):
     """JSON formatted logging output"""
 
 
-def _setup_console_logging() -> None:
+def _setup_key_value_logging(
+    *,
+    min_level: int | str = logging.NOTSET,
+    enable_rich_tracebacks: bool = True,
+) -> None:
     from importlib.util import find_spec
 
     # see https://www.structlog.org/en/stable/logging-best-practices.html#pretty-printing-vs-structured-output
-    if find_spec("rich") is not None:
+    if find_spec("rich") is not None and enable_rich_tracebacks:
         console_renderer = structlog.dev.ConsoleRenderer(
             sort_keys=False,
             exception_formatter=structlog.dev.RichTracebackFormatter(
@@ -62,7 +66,6 @@ def _setup_console_logging() -> None:
 
     processors = [
         structlog.contextvars.merge_contextvars,
-        structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         _elapsed_to_ms,
@@ -73,44 +76,41 @@ def _setup_console_logging() -> None:
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(logging.NOTSET),
+        wrapper_class=structlog.make_filtering_bound_logger(min_level=min_level),
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
 
 
-def _setup_key_value_logging() -> None:
+def _setup_json_logging(
+    *,
+    min_level: int | str = logging.NOTSET,
+) -> None:
+
+    processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.processors.dict_tracebacks,
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
+    ]
+
     try:
         import orjson
 
         _LOGGER.info("Using orjson serialization")
-        processors = [
-            structlog.contextvars.merge_contextvars,
-            # structlog.stdlib.filter_by_level,
-            # structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            _elapsed_to_ms,
-            structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer(serializer=orjson.dumps),
-        ]
+
+        processors.append(structlog.processors.JSONRenderer(serializer=orjson.dumps))
         logger_factory = structlog.BytesLoggerFactory()
     except ImportError:
-        _LOGGER.warning("Could not import orjson, fallback to buildin serializer.")
+        _LOGGER.warning("Could not import orjson, fallback to builtin serializer.")
 
-        processors = [
-            structlog.contextvars.merge_contextvars,
-            # structlog.stdlib.filter_by_level,
-            # structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            _elapsed_to_ms,
-            structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer(),
-        ]
+        processors.append(structlog.processors.JSONRenderer())
         logger_factory = structlog.stdlib.LoggerFactory()
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(logging.NOTSET),
+        wrapper_class=structlog.make_filtering_bound_logger(min_level=min_level),
         logger_factory=logger_factory,
         cache_logger_on_first_use=True,
     )
@@ -118,22 +118,39 @@ def _setup_key_value_logging() -> None:
 
 def setup_logging(
     *,
+    log_min_level: int | str = logging.NOTSET,
     log_levels: Mapping[str, int | str] | None = None,
     log_format: LogFormat = LogFormat.AUTOMATIC,
+    enable_rich_tracebacks: bool = True,
+    force_basic_config: bool = False,
 ) -> None:
-    """Set up structured logging."""
+    """Set up structured logging.
+
+    ``log_format`` can be overridden with the ``LOG_FORMAT`` environment variable.
+
+    :param log_min_level: Minimum logging level for structlog loggers.
+    :param log_levels: Logging levels for *all* loggers. Maps logger name to level.
+    :param log_format: Logging format for *all* loggers.
+    :param enable_rich_tracebacks: Enable Rich tracebacks if `KEY_VALUE` log format is used.
+    :param force_basic_config: ``force`` parameter of ``logging.basicConfig``.
+    """
     global _logging_initialized
     if _logging_initialized:
         return
 
-    logging.basicConfig(force=True, format="")
+    logging.basicConfig(format="", force=force_basic_config)
+
+    # structlog loggers created via structlog.stdlib.LoggerFactory are also gated by the stdlib level
+    if log_min_level != logging.NOTSET and (log_levels is None or "" not in log_levels):
+        logging.getLogger().setLevel(log_min_level)
+
     if log_levels is not None:
         for name, level in log_levels.items():
             try:
                 logging.getLogger(name).setLevel(level)
-                _LOGGER.debug(f"Set logger level of '{name}' to {level}")
+                _LOGGER.debug("Set logger level of %r to %s", name, level)
             except (TypeError, ValueError):
-                _LOGGER.exception(f"Could not set logger level of '{name}' to {level}")
+                _LOGGER.exception("Could not set logger level of %r to %s", name, level)
     if _LOGGER.level == logging.NOTSET:
         _LOGGER.setLevel(logging.INFO)
 
@@ -142,8 +159,8 @@ def setup_logging(
     if env_log_format is not None:
         try:
             log_format = LogFormat[env_log_format.upper()]
-        except ValueError:
-            _LOGGER.warning(f"Invalid log format '{env_log_format}'")
+        except KeyError:
+            _LOGGER.warning("Invalid log format %r", env_log_format)
 
     if log_format == LogFormat.AUTOMATIC:
         if sys.stderr.isatty():
@@ -154,8 +171,8 @@ def setup_logging(
             log_format = LogFormat.JSON
 
     if log_format == LogFormat.KEY_VALUE:
-        _setup_console_logging()
+        _setup_key_value_logging(min_level=log_min_level, enable_rich_tracebacks=enable_rich_tracebacks)
     else:  # JSON
-        _setup_key_value_logging()
+        _setup_json_logging(min_level=log_min_level)
 
     _logging_initialized = True
