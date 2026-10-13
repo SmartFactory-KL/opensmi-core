@@ -10,6 +10,7 @@ import shutil
 import sys
 from collections.abc import Mapping, MutableMapping
 from enum import Enum
+from pathlib import PurePath
 from typing import Any, Final
 
 import structlog
@@ -28,6 +29,15 @@ def _elapsed_to_ms(_, __, event_dict: MutableMapping[str, Any]) -> MutableMappin
     """Convert ``elapsed`` entry in structlog processor event dict to shorter format."""
     if "elapsed" in event_dict:
         event_dict["elapsed"] = _format_elapsed(event_dict["elapsed"])
+    return event_dict
+
+
+def _path_to_str(_, __, event_dict: MutableMapping[str, Any]) -> MutableMapping[str, Any]:  # noqa: ANN001
+    """Convert ``path`` entry in structlog processor event dict to simple string."""
+    if "path" in event_dict:
+        path = event_dict["path"]
+        if isinstance(path, PurePath):
+            event_dict["path"] = str(path)
     return event_dict
 
 
@@ -69,6 +79,7 @@ def _setup_key_value_logging(
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         _elapsed_to_ms,
+        _path_to_str,
         structlog.processors.TimeStamper(fmt="iso", utc=False),
         structlog.processors.UnicodeDecoder(),
         console_renderer,
@@ -91,6 +102,7 @@ def _setup_json_logging(
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
+        _path_to_str,
         structlog.processors.dict_tracebacks,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
     ]
