@@ -5,17 +5,25 @@
 """Mixin for async lifecycle management for mixin-composed classes.
 
 Concepts
+========
 
-Resource mixin: a plain class (does not inherit `LifecycleMixin`) with one or
-multiple ``@lifecycle``-decorated async-generator method(s). Code before yield is init;
-code after yield is shutdown.
+Resource
+    A single `lifecycle`-decorated async-generator method. Code before ``yield`` initializes it;
+    code after ``yield`` shuts it down. A resource is the unit of ordering:
+    ``after``, ``before`` and ``requires`` refer to resources, not classes.
 
-Composed class: the concrete class that inherits its resource mixins and
-`LifecycleMixin`. This is the only class that should inherit `LifecycleMixin`.
+Resource mixin
+    A plain class (does not inherit `LifecycleMixin`) that provides one or more resources.
 
-Ordering: resources init in dependency order and shut down in the exact
-reverse order. Order is resolved once, in `LifecycleMixin.__init_subclass__`, from
-``after`` / ``before`` arguments of ``@lifecycle``-decorated methods.
+Composed class
+    The concrete class that inherits its resource mixins and `LifecycleMixin`.
+    This is the only class that should inherit `LifecycleMixin`.
+
+Ordering
+    Resources are initialized in dependency order and shut down in the exact reverse order. Order is
+    resolved once, in `LifecycleMixin.__init_subclass__`, from ``after`` / ``before``
+    arguments of `lifecycle`-decorated methods. ``requires`` is checked at the same point
+    but imposes no ordering.
 """
 
 import graphlib
@@ -55,7 +63,7 @@ def lifecycle(
     before: _FuncOrFuncs = (),
     requires: _FuncOrFuncs = (),
 ) -> _LifecycleFunc | Callable[[_LifecycleFunc], _LifecycleFunc]:
-    """Mark an async generator method as a lifecycle resource.
+    """Mark an async generator method as a resource.
 
     Code before ``yield`` runs during initialization; code after ``yield``
     runs during shutdown, in reverse lifecycle order.
@@ -91,13 +99,13 @@ def lifecycle(
         setattr(func, _ATTR_LIFECYCLE_REQUIRES, tuple(_normalize(requires)))
         return func
 
-    if _func is not None:  # bare @resource, no args
+    if _func is not None:  # bare @lifecycle, no args
         return _decorator(_func)
-    return _decorator  # @resource(after=(...))
+    return _decorator  # @lifecycle(after=(...))
 
 
 class LifecycleMixin:
-    """Mixin managing the lifecycle of classes with ``@resource`` decorated methods."""
+    """Mixin managing the lifecycle of classes with `lifecycle` decorated methods."""
 
     __order: list[_Func] | None = None
     __generators: dict[_Func, AsyncGenerator[None, None]] | None = None
