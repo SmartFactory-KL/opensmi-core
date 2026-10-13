@@ -123,7 +123,7 @@ class LifecycleMixin:
         On failure, rollback anything already started, in reverse.
 
         :raises BaseException: Reraised exception from failed resource initialization.
-        :raises ExceptionGroup: If exceptions were caught during rollback.
+        :raises BaseExceptionGroup: If exceptions were caught during rollback.
         """
         if self.__state != LifecycleState.NEW:
             return self
@@ -154,13 +154,10 @@ class LifecycleMixin:
             rollback_exceptions: list[Exception] = await self.__shutdown(started)
             if rollback_exceptions:
                 msg = (
-                    f"Resource failed to initialize, and rollback {len(rollback_exceptions)} "
+                    f"Resource failed to initialize, and rollback of {len(rollback_exceptions)} "
                     "resource(s) failed to shut down cleanly."
                 )
-                raise ExceptionGroup(
-                    msg,
-                    [init_exception, *rollback_exceptions],  # pyright: ignore[reportArgumentType]
-                ) from init_exception
+                raise BaseExceptionGroup(msg, [init_exception, *rollback_exceptions]) from init_exception
             raise
 
         self.__state = LifecycleState.INITIALIZED
