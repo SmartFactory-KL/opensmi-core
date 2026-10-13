@@ -10,7 +10,7 @@ import shutil
 import sys
 from collections.abc import Mapping, MutableMapping
 from enum import Enum
-from typing import Any
+from typing import Any, Final
 
 import structlog
 
@@ -116,6 +116,12 @@ def _setup_json_logging(
     )
 
 
+DEFAULT_LOG_LEVELS: Final[dict[str, int | str]] = {
+    "opensmi": logging.INFO,
+    "asyncua": logging.ERROR,
+}
+
+
 def setup_logging(
     *,
     log_min_level: int | str = logging.NOTSET,
@@ -129,7 +135,7 @@ def setup_logging(
     ``log_format`` can be overridden with the ``LOG_FORMAT`` environment variable.
 
     :param log_min_level: Minimum logging level for structlog loggers.
-    :param log_levels: Logging levels for *all* loggers. Maps logger name to level.
+    :param log_levels: Logging levels for *all* loggers. Maps logger name to level. Defaults to `DEFAULT_LOG_LEVELS`.
     :param log_format: Logging format for *all* loggers.
     :param enable_rich_tracebacks: Enable Rich tracebacks if `KEY_VALUE` log format is used.
     :param force_basic_config: ``force`` parameter of ``logging.basicConfig``.
@@ -139,6 +145,9 @@ def setup_logging(
         return
 
     logging.basicConfig(format="", force=force_basic_config)
+
+    if log_levels is None:
+        log_levels = DEFAULT_LOG_LEVELS
 
     # structlog loggers created via structlog.stdlib.LoggerFactory are also gated by the stdlib level
     if log_min_level != logging.NOTSET and (log_levels is None or "" not in log_levels):
