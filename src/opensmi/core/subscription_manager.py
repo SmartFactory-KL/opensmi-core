@@ -66,12 +66,15 @@ class SubscriptionManager:
         ua_client: Client,
         publishing_interval_ms: float = 100,
         heartbeat_stale_after: float = 10.0,
+        max_items_per_call: int | None = None,
     ) -> None:
         """Create a new instance.
 
         :param ua_client: OPC UA client to use.
         :param publishing_interval_ms: Publishing interval in milliseconds for OPC UA subscription
         :param heartbeat_stale_after: Time in seconds until any subscription should be received.
+        :param max_items_per_call: Maximum number of OPC UA monitored items per call. If ``None``, will be read from the
+            servers ``MaxMonitoredItemsPerCall``.
         """
         self._publishing_interval_ms = publishing_interval_ms
         self._ua_client = ua_client
@@ -84,6 +87,7 @@ class SubscriptionManager:
         self._heartbeat_task: Task[Never] | None = None
         self._last_heartbeat = time.monotonic()
         self._heartbeat_stale_after = heartbeat_stale_after
+        self._max_items_per_call: int | None = max_items_per_call
 
         self.logger = structlog.getLogger("opensmi.SubscriptionManager")
 
@@ -93,6 +97,20 @@ class SubscriptionManager:
         )
         self.logger.info("Created subscription!", parameters=self._ua_subscription.parameters)
 
+    async def _read_max_items_per_call(self) -> None:
+        fallback_value = 100
+        ua_max_monitored_items_per_call = self._ua_client.get_node(
+            ua.object_ids.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxMonitoredItemsPerCall
+        )
+        try:
+            self._max_items_per_call = await ua_max_monitored_items_per_call.read_value() or fallback_value
+        except UaStatusCodeError as err:
+            self.logger.warning(
+                "Could not read server limit", ua_node=ua_max_monitored_items_per_call.nodeid.to_string(), reason=err
+            )
+            self._max_items_per_call = fallback_value
+        self.logger.debug("Updated max_items_per_call", value=self._max_items_per_call)
+
     async def init(self) -> None:
         """Create the subscription and start heartbeat monitoring.
 
@@ -101,7 +119,10 @@ class SubscriptionManager:
         if self._heartbeat_task is not None:
             return
 
-        await self._create_subscription()
+        async with asyncio.TaskGroup() as tg:
+            if self._max_items_per_call is None:
+                tg.create_task(self._read_max_items_per_call())
+            tg.create_task(self._create_subscription())
 
         # subscribe to a node that always changes reliably, for example the current time of the server
         # this is done to prevent the subscription from timing out
