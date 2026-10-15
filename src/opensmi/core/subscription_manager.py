@@ -19,7 +19,6 @@ from asyncua.client.client import Client
 from asyncua.common.node import Node
 from asyncua.common.subscription import DataChangeNotif, Subscription
 from asyncua.ua import NodeId, UaStatusCodeError
-from asyncua.ua.uaerrors import BadAttributeIdInvalid
 
 from opensmi.core.protocols import UaEvent
 
@@ -48,6 +47,20 @@ class _MonitoredItem(Generic[_HandlerType]):
     handle: int | None
     """Handle as returned by ``asyncua``. Is ``None`` when renew failed."""
     handlers: list[_HandlerType] = field(default_factory=list)
+    """List of handler that are subscribed to the monitored item. Shall not contain duplicates."""
+
+    def add_handlers(self, handlers: Iterable[_HandlerType]) -> None:
+        """Add given handlers if they are not already in the ``handlers`` list."""
+        for handler in handlers:
+            if handler not in self.handlers:
+                self.handlers.append(handler)
+
+
+@dataclass
+class _Wanted:
+    node: Node
+    handlers: list[UaDataChangeSubscriber] = field(default_factory=list)
+    """List of handlers that asked to be subscribed to ``node``."""
 
 
 class SubscriptionManager:
@@ -234,6 +247,50 @@ class SubscriptionManager:
             results.extend(await self._ua_subscription.subscribe_data_change(batch))
         return results
 
+    def _collect_wanted(
+        self,
+        subscriptions: Iterable[tuple[UaDataChangeSubscriber, Node | NodeId | Iterable[Node | NodeId]]],
+    ) -> dict[NodeId, _Wanted]:
+        wanted: dict[NodeId, _Wanted] = {}
+        for handler, nodes in subscriptions:
+            if not isinstance(nodes, Iterable):
+                nodes = [nodes]
+            for node in nodes:
+                if isinstance(node, NodeId):
+                    node = self._ua_client.get_node(node)
+                entry = wanted.setdefault(node.nodeid, _Wanted(node))
+                if handler not in entry.handlers:
+                    entry.handlers.append(handler)
+        return wanted
+
+    def _attach_to_monitored(self, wanted: dict[NodeId, _Wanted]) -> list[Node]:
+        new_nodes: list[Node] = []
+        for node_id, entry in wanted.items():
+            item = self._data_subscription_map.get(node_id)
+            if item is None:
+                new_nodes.append(entry.node)
+            else:
+                item.add_handlers(entry.handlers)
+        return new_nodes
+
+    async def _subscribe_new_nodes(
+        self, new_nodes: list[Node], wanted: dict[NodeId, _Wanted]
+    ) -> dict[Node, ua.StatusCode]:
+        results: list[int | ua.StatusCode] = await self._create_data_items(new_nodes)
+
+        errors: dict[Node, ua.StatusCode] = {}
+        for node, result in zip(new_nodes, results, strict=True):
+            if isinstance(result, ua.StatusCode):
+                errors[node] = result
+                continue
+
+            handlers: list[UaDataChangeSubscriber] = wanted[node.nodeid].handlers
+            if (item := self._data_subscription_map.get(node.nodeid)) is None:
+                self._data_subscription_map[node.nodeid] = _MonitoredItem(handle=result, handlers=handlers)
+            else:
+                item.add_handlers(handlers)
+        return errors
+
     async def subscribe_data_change(
         self, handler: UaDataChangeSubscriber, nodes: Node | NodeId | Iterable[Node | NodeId]
     ) -> dict[Node, ua.StatusCode]:
@@ -243,42 +300,22 @@ class SubscriptionManager:
 
         :return: OPC UA error status codes for all failed subscriptions. Mapping of node to status code.
         """
-        if not isinstance(nodes, Iterable):
-            nodes = [nodes]  # create a list out of the given single node or node id
+        return await self.subscribe_data_change_batch([(handler, nodes)])
 
-        # get nodes for all node ids
-        nodes = [self._ua_client.get_node(node) if isinstance(node, NodeId) else node for node in nodes]
+    async def subscribe_data_change_batch(
+        self,
+        subscriptions: Iterable[tuple[UaDataChangeSubscriber, Node | NodeId | Iterable[Node | NodeId]]],
+    ) -> dict[Node, ua.StatusCode]:
+        """Subscribe many handlers to many nodes using as few server calls as possible.
 
-        # figure out whether we need to subscribe to nodes on the server
-        new: dict[NodeId, Node] = {}
-        for node in nodes:
-            node_id = node.nodeid
-            assert isinstance(node_id, NodeId)
-            item = self._data_subscription_map.get(node_id)
-            if item is not None:
-                if handler not in item.handlers:
-                    item.handlers.append(handler)
-                else:
-                    self.logger.warning("Handler already subscribed!", handler=handler, node=node_id.to_string())
-            else:
-                new.setdefault(node_id, node)
-
-        if not new:
+        :param subscriptions: Pairs of ``(handler, nodes)``. A node may appear for several handlers.
+        :return: OPC UA error status codes for all failed subscriptions. Mapping of node to status code.
+        """
+        wanted = self._collect_wanted(subscriptions)
+        new_nodes = self._attach_to_monitored(wanted)
+        if not new_nodes:
             return {}
-
-        # subscribe to all new nodes
-        results = await self._create_data_items(list(new.values()))
-
-        errors: dict[Node, ua.StatusCode] = {}
-        for node, result in zip(new.values(), results, strict=True):
-            if isinstance(result, ua.StatusCode):
-                errors[node] = result
-            else:
-                node_id = node.nodeid
-                assert isinstance(node_id, NodeId)
-                self._data_subscription_map[node_id] = _MonitoredItem(handle=result, handlers=[handler])
-
-        return errors
+        return await self._subscribe_new_nodes(new_nodes, wanted)
 
     async def subscribe_event(self, handler: UaEventSubscriber, source_node: Node | NodeId) -> None:
         """Add given handler to receive event notifications for given node."""
