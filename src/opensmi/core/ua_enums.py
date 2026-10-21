@@ -47,7 +47,7 @@ class SkillState(Enum):
     RESETTING = (19, "Resetting")
     """Intermediate state leading to `SkillState.READY` on success or `SkillState.HALTING` on failure."""
     SUSPENDING = (20, "Suspending")
-    """Intermediate state leading to `SkillState.SUSPENDING` on success or `SkillState.HALTING` on failure."""
+    """Intermediate state leading to `SkillState.SUSPENDED` on success or `SkillState.HALTING` on failure."""
 
     @property
     def localized_text(self) -> ua.LocalizedText:
