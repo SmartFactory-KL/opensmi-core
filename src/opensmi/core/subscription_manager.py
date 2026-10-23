@@ -84,7 +84,8 @@ class SubscriptionManager:
         """Create a new instance.
 
         :param ua_client: OPC UA client to use.
-        :param publishing_interval_ms: Publishing interval in milliseconds for OPC UA subscription
+        :param publishing_interval_ms: Requested publishing interval in milliseconds for OPC UA subscription.
+            May be revised by the server.
         :param heartbeat_stale_after: Time in seconds until any subscription should be received.
         :param max_items_per_call: Maximum number of OPC UA monitored items per call. If ``None``, will be read from the
             servers ``MaxMonitoredItemsPerCall``.
@@ -109,6 +110,12 @@ class SubscriptionManager:
             period=self._publishing_interval_ms, handler=self
         )
         self.logger.info("Created subscription!", parameters=self._ua_subscription.parameters)
+        actual = self._ua_subscription.parameters.RequestedPublishingInterval
+        if actual != self._publishing_interval_ms:
+            self.logger.warning(
+                "Requested publishing interval was revised!", requested=self._publishing_interval_ms, actual=actual
+            )
+            self._publishing_interval_ms = actual
 
     async def _read_max_items_per_call(self) -> None:
         fallback_value = 100
