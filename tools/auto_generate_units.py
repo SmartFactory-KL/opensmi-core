@@ -129,6 +129,7 @@ def _write_python_file(path: Path, units: dict[str, _UneceUnit], class_name: str
             _write_unit(file, unit)
     _LOGGER.info(f"Written {class_name=} {doc=} to {path=}")
 
+
 def _check(path: Path) -> None:
     subprocess.run(["ruff", "check", "--fix", str(path)], check=True)
     subprocess.run(["ruff", "format", str(path)], check=True)
@@ -138,6 +139,7 @@ def _check(path: Path) -> None:
 
     # finally, make sure the file is valid python after formatting & linting
     compile(generated_code, path, "exec")
+
 
 def _main() -> None:
     units = _parse(SRC_PATH)
@@ -165,6 +167,7 @@ def _main() -> None:
 
     _write_python_file(DEST_PATH, units=units, class_name="Unit", doc="All units")
     _check(DEST_PATH)
+
 
 if __name__ == "__main__":
     _main()

@@ -50,9 +50,7 @@ class BaseUaObject(Generic[_ServerType]):
         if parent is not None:
             self.parent = parent  # via setter to allow optional runtime type checking
         self._ua_node: Node | None = None
-        self._logger: structlog.BoundLogger = structlog.get_logger(
-            f"opensmi.{self.__class__.__name__}", name=self.name
-        )
+        self._logger: structlog.BoundLogger = structlog.get_logger(f"opensmi.{self.__class__.__name__}", name=self.name)
 
         super().__init__(**kwargs)  # cooperative __init__() after we are done
 

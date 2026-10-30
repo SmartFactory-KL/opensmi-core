@@ -142,7 +142,7 @@ async def get_type_definition(ua_node: Node, *, default: str = "UNKNOWN") -> str
     if len(type_definition_list) > 0:
         return type_definition_list[0].BrowseName.Name
 
-    _LOGGER.warning("Could not determine type definition!", ua_node = ua_node.nodeid.to_string(), default=default)
+    _LOGGER.warning("Could not determine type definition!", ua_node=ua_node.nodeid.to_string(), default=default)
     return default
 
 
@@ -178,7 +178,9 @@ def get_node_id(
     return ua.NodeId(Identifier=identifier, NamespaceIndex=ua.Int16(ns_idx))
 
 
-async def get_child_without_ns(parent: Node, *, browse_name: str | None = None, display_name: str | None = None) -> Node:
+async def get_child_without_ns(
+    parent: Node, *, browse_name: str | None = None, display_name: str | None = None
+) -> Node:
     """Return the first child node with given ``browse_name`` or ``display_name`` while ignoring namespaces.
 
     For each child, ``BrowseName`` is matched first, ``DisplayName`` afterward. If both are given, a child matching
