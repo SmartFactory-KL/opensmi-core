@@ -1,0 +1,14 @@
+.github/workflows/checks.yml
+  h_3a91ce8773dd89 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "242780f6570d8852355c9ab5fe3335ccbba3e1e9",
+  "prompts": {},
+  "humans": {
+    "h_3a91ce8773dd89": {
+      "author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
