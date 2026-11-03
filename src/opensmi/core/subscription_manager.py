@@ -354,7 +354,8 @@ class SubscriptionManager:
 
         if node_id not in self._event_subscription_map:
             types = [
-                self._ua_client.get_node(t) for t in (ua.NodeId(ua.object_ids.ObjectIds.BaseEventType), *event_types)
+                self._ua_client.get_node(t)
+                for t in (ua.NodeId(ua.Int32(ua.object_ids.ObjectIds.BaseEventType)), *event_types)
             ]
             event_filter = await get_filter_from_event_type(types)
             handle = await self._ua_subscription.subscribe_events(
@@ -386,7 +387,8 @@ class SubscriptionManager:
     async def unsubscribe_event(self, handler: UaEventSubscriber, source_node: Node | NodeId) -> None:
         """Remove handler for events of given node; removes server subscription once it has no handlers left."""
         node_id = source_node.nodeid if isinstance(source_node, Node) else source_node
-        await self._unsubscribe(handler=handler, node_id=node_id, subscription_map=self._event_subscription_map)
+        assert isinstance(node_id, NodeId)
+        await self._unsubscribe(handler=handler, node_id=node_id, subscription_map=self._event_subscription_map)  # pyright: ignore[reportArgumentType]
 
     async def _unsubscribe(
         self,
