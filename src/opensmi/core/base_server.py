@@ -13,7 +13,7 @@ from asyncua import ua
 
 from opensmi.core.base_ua_object import BaseUaObject
 from opensmi.core.protocols import NamespaceProvider
-from opensmi.core.ua import NodeIdDefinition
+from opensmi.core.ua import NodeIdDefinition, QualifiedName
 
 _UaObjectType = TypeVar("_UaObjectType", bound=BaseUaObject)
 
@@ -64,12 +64,53 @@ class BaseServer(Generic[_UaObjectType]):
 
         return ua.Int16(self._namespace_map[uri])
 
-    def ua_get_node_id(self, identifier: NodeIdDefinition) -> ua.NodeId:
-        """Return the complete OPC UA node ID for the given ``identifier``.
+    def ua_get_namespace_uri(self, index: int) -> str:
+        """Return the namespace URI for the given namespace ``index``.
 
-        :raises KeyError: If the namespace URI of the identifier is unknown.
+        :raises KeyError: If the server has no namespace at ``index``.
+        """
+        for uri, ns_index in self._namespace_map.items():
+            if ns_index == index:
+                return uri
+        raise KeyError(index)
+
+    def ua_get_node_id(self, definition: NodeIdDefinition) -> ua.NodeId:
+        """Return the complete OPC UA node ID for the given ``definition``.
+
+        :raises KeyError: If the namespace URI of the definition is unknown.
         """
         return ua.NodeId(
-            Identifier=identifier.id,
-            NamespaceIndex=self.ua_get_namespace_index(identifier.ns_uri),
+            Identifier=definition.identifier,  # pyright: ignore[reportArgumentType]
+            NamespaceIndex=self.ua_get_namespace_index(definition.namespace_uri),
+        )
+
+    def ua_to_node_id_definition(self, node_id: ua.NodeId) -> NodeIdDefinition:
+        """Convert the given node ID to a node ID definition.
+
+        An ``ua.ExpandedNodeId`` uses its ``NamespaceUri`` if set.
+
+        :raises KeyError: If the namespace index is unknown.
+        :raises ValueError: If an ``ua.ExpandedNodeId`` points to another server.
+        """
+        namespace_uri = None
+        if isinstance(node_id, ua.ExpandedNodeId):
+            if node_id.ServerIndex:
+                msg = f"{node_id.to_string()} is on another server (ServerIndex {node_id.ServerIndex})"
+                raise ValueError(msg)
+            namespace_uri = node_id.NamespaceUri
+        return NodeIdDefinition(
+            identifier=node_id.Identifier,
+            namespace_uri=namespace_uri or self.ua_get_namespace_uri(node_id.NamespaceIndex),
+        )
+
+    def ua_to_qualified_name(self, qualified_name: ua.QualifiedName) -> QualifiedName:
+        """Convert `ua.QualifiedName` to our `QualifiedName`."""
+        return QualifiedName(
+            namespace_uri=self.ua_get_namespace_uri(qualified_name.NamespaceIndex), name=qualified_name.Name
+        )
+
+    def ua_from_qualified_name(self, qualified_name: QualifiedName) -> ua.QualifiedName:
+        """Convert from our `QualifiedName` to  `ua.QualifiedName`."""
+        return ua.QualifiedName(
+            Name=qualified_name.name, NamespaceIndex=self.ua_get_namespace_index(qualified_name.namespace_uri)
         )
