@@ -1,0 +1,26 @@
+src/opensmi/core/base_server.py
+  s_f6cc623adfb8dd::t_6acdacaf73aabe 16,67-77,83-115
+  s_f6cc623adfb8dd::t_714e61e7b9d473 78,80
+src/opensmi/core/ua.py
+  s_f6cc623adfb8dd::t_7ed497410599ca 7,9,13-14,16-17,19-55,57-59
+tests/test_ua_values.py
+  s_f6cc623adfb8dd::t_2e947222fb4070 1-268
+.gitignore
+  s_f6cc623adfb8dd::t_19b174949d5592 18-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "578bb4b26a997660ac151f451e18e46376178538",
+  "prompts": {},
+  "sessions": {
+    "s_f6cc623adfb8dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ed30be-351e-4ea9-92e4-ed58b5bfb384",
+        "model": "unknown"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
