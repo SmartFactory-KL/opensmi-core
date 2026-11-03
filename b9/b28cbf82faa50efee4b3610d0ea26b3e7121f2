@@ -1,0 +1,14 @@
+src/opensmi/core/subscription_manager.py
+  h_3a91ce8773dd89 19,60-65,105,197,334-344,347,356-366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b9b28cbf82faa50efee4b3610d0ea26b3e7121f2",
+  "prompts": {},
+  "humans": {
+    "h_3a91ce8773dd89": {
+      "author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
