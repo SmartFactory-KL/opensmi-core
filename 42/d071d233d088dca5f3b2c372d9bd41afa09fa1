@@ -1,0 +1,21 @@
+src/opensmi/core/__init__.py
+  s_f6cc623adfb8dd::t_5835ef106e4554 16-19
+src/opensmi/core/ua.py
+  s_f6cc623adfb8dd::t_25ead839cc525b 9,13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "42d071d233d088dca5f3b2c372d9bd41afa09fa1",
+  "prompts": {},
+  "sessions": {
+    "s_f6cc623adfb8dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ed30be-351e-4ea9-92e4-ed58b5bfb384",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
