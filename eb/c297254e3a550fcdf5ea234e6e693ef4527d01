@@ -1,0 +1,49 @@
+tests/test_nodesets.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-48
+src/opensmi/core/nodesets/__init__.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 6
+  s_f6cc623adfb8dd::t_6cd34af4fd8227 1-5,7-26
+src/opensmi/core/nodesets/di.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-73
+src/opensmi/core/nodesets/smart_factory_skill_set.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 6
+  s_f6cc623adfb8dd::t_6d7acce91cd20c 1-5,7-31
+pyproject.toml
+  s_f6cc623adfb8dd::t_7ef0dfeb8b9d06 77-79
+tools/auto_generate_nodesets.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-220
+src/opensmi/core/nodesets/machinery.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-35
+src/opensmi/core/nodesets/smart_factory_machine_set.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-51
+src/opensmi/core/nodesets/rsl.py
+  s_f6cc623adfb8dd::t_cc77432f73eb60 1-30
+src/opensmi/core/nodesets/Opc.Ua.Di.NodeSet2.xml
+  s_f6cc623adfb8dd::t_8b93e1fa077d01 1-5719
+src/opensmi/core/nodesets/Opc.Ua.Machinery.NodeSet2.xml
+  s_f6cc623adfb8dd::t_84099868a64d8e 1-1713
+src/opensmi/core/nodesets/Opc.Ua.RSL.NodeSet2.xml
+  s_f6cc623adfb8dd::t_80ab8f884d6290 1-601
+src/opensmi/core/nodesets/Opc.Ua.SmartFactory.MachineSet.NodeSet2.xml
+  s_f6cc623adfb8dd::t_084347c2fa5a76 1-2886
+src/opensmi/core/nodesets/Opc.Ua.SmartFactory.SkillSet.NodeSet2.xml
+  s_f6cc623adfb8dd::t_ff1d49b8f9326c 1-856
+tools/nodeset.py.template
+  s_f6cc623adfb8dd::t_cd43caf3d46998 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ebc297254e3a550fcdf5ea234e6e693ef4527d01",
+  "prompts": {},
+  "sessions": {
+    "s_f6cc623adfb8dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ed30be-351e-4ea9-92e4-ed58b5bfb384",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
