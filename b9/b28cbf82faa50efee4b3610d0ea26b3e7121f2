@@ -1,5 +1,5 @@
 src/opensmi/core/subscription_manager.py
-  h_3a91ce8773dd89 19,60-65,105,197,334-344,347,356-366
+  h_3a91ce8773dd89 19,60-65,105,197,334-344,347,356-366,356,358-366
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -9,6 +9,16 @@ src/opensmi/core/subscription_manager.py
   "humans": {
     "h_3a91ce8773dd89": {
       "author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  },
+  "sessions": {
+    "s_f6cc623adfb8dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ed30be-351e-4ea9-92e4-ed58b5bfb384",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
     }
   }
 }
