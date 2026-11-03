@@ -16,6 +16,7 @@ from typing import Any, Generic, Never, TypeVar
 import structlog
 from asyncua import ua
 from asyncua.client.client import Client
+from asyncua.common.events import get_filter_from_event_type
 from asyncua.common.node import Node
 from asyncua.common.subscription import DataChangeNotif, Subscription
 from asyncua.ua import NodeId, UaStatusCodeError
@@ -57,6 +58,12 @@ class _MonitoredItem(Generic[_HandlerType]):
 
 
 @dataclass
+class _MonitoredEventItem(_MonitoredItem[UaEventSubscriber]):
+    event_filter: ua.EventFilter | None = None
+    """Filter the item was created with; reused on renewal so the selected fields stay the same."""
+
+
+@dataclass
 class _Wanted:
     node: Node
     handlers: list[UaDataChangeSubscriber] = field(default_factory=list)
@@ -95,7 +102,7 @@ class SubscriptionManager:
 
         self._data_subscription_map: dict[NodeId, _MonitoredItem[UaDataChangeSubscriber]] = {}
         """ Maps a OPC UA node to a handle and a list of handlers for data change notifications. """
-        self._event_subscription_map: dict[NodeId, _MonitoredItem[UaEventSubscriber]] = {}
+        self._event_subscription_map: dict[NodeId, _MonitoredEventItem] = {}
         """ Maps a OPC UA node to a handle and a list of handlers for event notifications. """
 
         self._heartbeat_task: Task[Never] | None = None
@@ -187,7 +194,7 @@ class SubscriptionManager:
     async def _renew_event_subscriptions(self) -> None:
         for node_id, monitored_item in list(self._event_subscription_map.items()):
             try:
-                handle = await self._ua_subscription.subscribe_events(node_id)
+                handle = await self._ua_subscription.subscribe_events(node_id, evfilter=monitored_item.event_filter)
                 monitored_item.handle = handle
             except UaStatusCodeError as err:
                 monitored_item.handle = None
@@ -324,10 +331,20 @@ class SubscriptionManager:
             return {}
         return await self._subscribe_new_nodes(new_nodes, wanted)
 
-    async def subscribe_event(self, handler: UaEventSubscriber, source_node: Node | NodeId) -> None:
-        """Add given handler to receive event notifications for given node."""
+    async def subscribe_event(
+        self,
+        handler: UaEventSubscriber,
+        source_node: Node | NodeId,
+        *,
+        event_types: Sequence[NodeId] = (),
+    ) -> None:
+        """Add given handler to receive event notifications for given node.
+
+        :param event_types: Additional event types beside ``BaseEventType`` to subscribe.
+        """
         # we only get the node ID in the notification
         if isinstance(source_node, Node):
+            assert isinstance(source_node.nodeid, NodeId)
             node_id: NodeId = source_node.nodeid
         elif isinstance(source_node, NodeId):
             node_id = source_node
@@ -336,8 +353,17 @@ class SubscriptionManager:
             raise TypeError(msg)
 
         if node_id not in self._event_subscription_map:
-            handle = await self._ua_subscription.subscribe_events(sourcenode=source_node)
-            self._event_subscription_map[node_id] = _MonitoredItem(handle=handle, handlers=[handler])
+            types = [
+                self._ua_client.get_node(t) for t in (ua.NodeId(ua.object_ids.ObjectIds.BaseEventType), *event_types)
+            ]
+            event_filter = await get_filter_from_event_type(types)
+            handle = await self._ua_subscription.subscribe_events(
+                sourcenode=source_node,
+                evfilter=event_filter,
+            )
+            self._event_subscription_map[node_id] = _MonitoredEventItem(
+                handle=handle, handlers=[handler], event_filter=event_filter
+            )
             self.logger.debug("Added event handler", handler=handler, node=node_id.to_string(), handle=handle)
         else:
             # We only need 1 subscription for n handlers.
