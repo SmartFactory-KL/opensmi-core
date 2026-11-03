@@ -6,12 +6,12 @@
 
 import uuid
 from dataclasses import dataclass
-from typing import Self
+from typing import Final, Self
 
 from asyncua import ua
 
-OPC_UA_NS = "http://opcfoundation.org/UA/"
-_UINT32_MAX = 2**32 - 1
+OPC_UA_NS: Final[str] = "http://opcfoundation.org/UA/"
+_UINT32_MAX: Final[int] = 2**32 - 1
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

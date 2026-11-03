@@ -13,6 +13,10 @@ from .lifecycle_mixin import lifecycle as lifecycle
 from .logging import LogFormat as LogFormat
 from .logging import setup_logging as setup_logging
 from .signal import Signal as Signal
+from .ua import OPC_UA_NS as OPC_UA_NS
+from .ua import LocalizedText as LocalizedText
+from .ua import NodeIdDefinition as NodeIdDefinition
+from .ua import QualifiedName as QualifiedName
 from .ua_enums import MachineryItemState as MachineryItemState
 from .ua_enums import MachineryOperationMode as MachineryOperationMode
 from .ua_enums import SkillState as SkillState
