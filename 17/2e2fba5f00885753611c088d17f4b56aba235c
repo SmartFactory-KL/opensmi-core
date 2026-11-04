@@ -1,0 +1,44 @@
+tests/test_paths.py
+  s_f6cc623adfb8dd::t_bb3d0bb5b15540 1-34,36-101,103-110
+  s_f6cc623adfb8dd::t_3f00416f835bb6 35,102
+src/opensmi/core/base_ua_object.py
+  s_f6cc623adfb8dd::t_6fdea10cb3f646 7,14-15
+  s_f6cc623adfb8dd::t_d4f91a2cca8973 27-29,34,42-43,56-57
+  s_f6cc623adfb8dd::t_a0bd8765d63aa4 99-101,104-107
+src/opensmi/core/__init__.py
+  s_f6cc623adfb8dd::t_48219700287f21 15
+tests/test_object_path.py
+  s_f6cc623adfb8dd::t_ed17d44c5da43e 87-89
+  s_f6cc623adfb8dd::t_5b1508c4cd81b2 1-86,92-110,113-161,163-195,197-209,211-261
+  s_f6cc623adfb8dd::t_a7c7e16f2b5960 90-91,111-112,162,196,210
+src/opensmi/core/paths.py
+  s_f6cc623adfb8dd::t_04bc52b9b83254 209,211,214
+  s_f6cc623adfb8dd::t_4bee9d1bbfe58b 15
+  s_f6cc623adfb8dd::t_8bcfae342267e6 27-28
+  s_f6cc623adfb8dd::t_712fec3bd31159 150-153
+  s_f6cc623adfb8dd::t_88babccbdf034f 1-4,6,9-10,19-26,172-174,177-178,181
+  s_f6cc623adfb8dd::t_d6b14f716e7f16 111-117
+  s_f6cc623adfb8dd::t_86948a190c0138 5,7-8,11-13,16-18,29-34,43-110,118-149,154-160,163-171,175-176,207
+  s_f6cc623adfb8dd::t_0c583371ca3b40 35-42
+  s_f6cc623adfb8dd::t_85e42972881520 162
+  s_f6cc623adfb8dd::t_78959b5df9d3d7 14,179-180,182-190,192-194,198-203,205-206,208,210,212-213,215-216
+  s_f6cc623adfb8dd::t_52ac2d01111b52 195
+  s_f6cc623adfb8dd::t_c040a164f5cd6d 161
+  s_f6cc623adfb8dd::t_55f6a27a5ba6e2 191,196-197,204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "172e2fba5f00885753611c088d17f4b56aba235c",
+  "prompts": {},
+  "sessions": {
+    "s_f6cc623adfb8dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ed30be-351e-4ea9-92e4-ed58b5bfb384",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
