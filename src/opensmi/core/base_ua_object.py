@@ -4,13 +4,14 @@
 
 """Base class for all UA objects, both client- and server-side."""
 
-from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import structlog
 from asyncua.common.node import Node
 from structlog.stdlib import BoundLogger
 from typing_extensions import deprecated
+
+from opensmi.core.paths import ObjectPath, sanitize_segment
 
 if TYPE_CHECKING:
     from opensmi.core.base_server import BaseServer
@@ -23,10 +24,14 @@ class BaseUaObject(Generic[_ServerType]):
 
     _parent: "BaseUaObject[_ServerType] | None" = None
 
+    _folder: ClassVar[str | None] = None
+    """OpenSMI folder between the parent and this object in the path, e.g. ``"SkillSet"``; ``None`` for none."""
+
     def __init__(
         self,
         *,
         name: str | None = None,
+        segment: str | None = None,
         server: _ServerType | None = None,
         parent: "BaseUaObject[_ServerType] | None" = None,
         **kwargs,
@@ -34,6 +39,8 @@ class BaseUaObject(Generic[_ServerType]):
         """*Cooperative* constructor.
 
         :param name: The name of the UA object. Defaults to the class name.
+        :param segment: The last segment of the object's path. Defaults to the sanitized ``name``; clients pass the
+            unique segment from ``opensmi.core.paths.unique_segments()``.
         :param server: The associated server of the UA object. Note that there must be at least one non ``None`` in
             the hierarchy.
         :param parent: The parent of the UA object. Only Machines are allowed to have no parent. Can be set later before
@@ -46,6 +53,8 @@ class BaseUaObject(Generic[_ServerType]):
             raise TypeError(msg)
 
         self._name: str = name
+        self._segment: str = sanitize_segment(name) if segment is None else segment
+        _ = ObjectPath((self._segment,))  # check the segment early
         self._server: _ServerType | None = server
         if parent is not None:
             self.parent = parent  # via setter to allow optional runtime type checking
@@ -87,12 +96,15 @@ class BaseUaObject(Generic[_ServerType]):
         return f"/{self.name}"
 
     @property
-    def path(self) -> PurePosixPath:
-        """Return the full path of the object."""
+    def path(self) -> ObjectPath:
+        """Return the full path of the object: the parent's path, the OpenSMI folder (if any) and the segment."""
+        base = ObjectPath()
         if self.parent is not None:
             assert isinstance(self.parent, BaseUaObject)
-            return self.parent.path / self.name
-        return PurePosixPath("/") / self.name
+            base = self.parent.path
+        if self._folder is not None:
+            base /= self._folder
+        return base / self._segment
 
     @property
     def logger(self) -> BoundLogger:

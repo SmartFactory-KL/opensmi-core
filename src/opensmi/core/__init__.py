@@ -12,6 +12,7 @@ from .lifecycle_mixin import LifecycleMixin as LifecycleMixin
 from .lifecycle_mixin import lifecycle as lifecycle
 from .logging import LogFormat as LogFormat
 from .logging import setup_logging as setup_logging
+from .paths import ObjectPath as ObjectPath
 from .signal import Signal as Signal
 from .ua import OPC_UA_NS as OPC_UA_NS
 from .ua import LocalizedText as LocalizedText
