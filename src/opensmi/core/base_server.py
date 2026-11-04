@@ -9,11 +9,15 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 from weakref import WeakValueDictionary
 
+import structlog
 from asyncua import ua
 
 from opensmi.core.base_ua_object import BaseUaObject
+from opensmi.core.paths import ObjectPath
 from opensmi.core.protocols import NamespaceProvider
 from opensmi.core.ua import NodeIdDefinition, QualifiedName
+
+_LOGGER = structlog.get_logger("opensmi." + __name__)
 
 _UaObjectType = TypeVar("_UaObjectType", bound=BaseUaObject)
 
@@ -27,7 +31,36 @@ class BaseServer(Generic[_UaObjectType]):
 
         self._ua_objects: WeakValueDictionary[ua.NodeId, _UaObjectType] = WeakValueDictionary()
         """Maps OPC UA nodes to UaObjects with weak references."""
+        self._ua_objects_by_path: WeakValueDictionary[ObjectPath, _UaObjectType] = WeakValueDictionary()
+        """Maps canonical paths and aliases to UaObjects with weak references."""
         self._namespace_map: dict[str, int] = {}
+
+    def resolve(self, path: ObjectPath | str) -> _UaObjectType:
+        """Return the object at ``path``, its canonical path or one of its aliases.
+
+        :raises KeyError: If no object has this path.
+        :raises ValueError: If ``path`` is a ``str`` that is no valid path.
+        """
+        return self._ua_objects_by_path[ObjectPath.of(path)]
+
+    def resolve_optional(self, path: ObjectPath | str) -> _UaObjectType | None:
+        """Return the object at ``path``, its canonical path or one of its aliases, or ``None``.
+
+        :raises ValueError: If ``path`` is a ``str`` that is no valid path.
+        """
+        return self._ua_objects_by_path.get(ObjectPath.of(path))
+
+    def find(self, pattern: str) -> list[_UaObjectType]:
+        """Return all objects whose canonical path matches the glob ``pattern`` (see `ObjectPath.match`), in tree order.
+
+        :raises ValueError: If ``pattern`` is no valid pattern.
+        """
+        found = [
+            (path, ua_object)
+            for path, ua_object in list(self._ua_objects_by_path.items())
+            if path == ua_object.path and path.match(pattern)
+        ]
+        return [ua_object for _, ua_object in sorted(found, key=lambda item: item[0])]
 
     def get_ua_object(self, ua_node_id: ua.NodeId) -> _UaObjectType:
         """Return the ``UaObject`` which corresponds to the given ``ua_node``.
@@ -41,18 +74,50 @@ class BaseServer(Generic[_UaObjectType]):
         return self._ua_objects.get(ua_node_id, default=None)
 
     def register_ua_object(self, ua_object: _UaObjectType) -> None:
-        """Register the given ``UaObject`` to the server."""
+        """Register the given ``UaObject`` to the server, by node and by its canonical path and aliases.
+
+        Objects register top-down: the path is taken now, so the parent must already be registered and can't change
+        anymore (`BaseUaObject._set_parent`).
+
+        :raises RuntimeError: If the object has a parent that isn't registered.
+        """
         assert ua_object is not None
         assert isinstance(ua_object.ua_node.nodeid, ua.NodeId)
 
+        parent = ua_object._parent  # noqa: SLF001  the public getter may refuse an unset parent
+        if parent is not None and (
+            parent._ua_node is None  # noqa: SLF001
+            or self._ua_objects.get(parent._ua_node.nodeid) is not parent  # noqa: SLF001
+        ):
+            msg = f"Cannot register {ua_object!r} at {ua_object.path}: its parent {parent!r} isn't registered yet"
+            raise RuntimeError(msg)
+
         self._ua_objects[ua_object.ua_node.nodeid] = ua_object
+        for path in (ua_object.path, *ua_object.aliases):
+            self._register_path(path, ua_object)
 
     def unregister_ua_object(self, ua_object: _UaObjectType) -> None:
-        """Unregister the given ``UaObject`` from the server."""
+        """Unregister the given ``UaObject`` from the server, by node and by its canonical path and aliases."""
         assert ua_object is not None
         assert isinstance(ua_object.ua_node.nodeid, ua.NodeId)
 
         _ = self._ua_objects.pop(ua_object.ua_node.nodeid)
+        for path in (ua_object.path, *ua_object.aliases):
+            if self._ua_objects_by_path.get(path) is ua_object:
+                del self._ua_objects_by_path[path]
+
+    def _register_path(self, path: ObjectPath, ua_object: _UaObjectType) -> None:
+        """Map ``path`` to ``ua_object``; a path already taken by another object keeps that object."""
+        existing = self._ua_objects_by_path.get(path)
+        if existing is not None and existing is not ua_object:
+            _LOGGER.error("Path already registered, keeping the first object", path=str(path), existing=repr(existing))
+            return
+        self._ua_objects_by_path[path] = ua_object
+
+    def _clear_ua_objects(self) -> None:
+        """Forget all registered objects, by node and by path (e.g. before a client browses again)."""
+        self._ua_objects.clear()
+        self._ua_objects_by_path.clear()
 
     def ua_get_namespace_index(self, uri: str | type[NamespaceProvider]) -> ua.Int16:
         """Return the namespace index for the given namespace ``uri``.

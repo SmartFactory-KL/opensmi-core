@@ -55,10 +55,11 @@ class BaseUaObject(Generic[_ServerType]):
         self._name: str = name
         self._segment: str = sanitize_segment(name) if segment is None else segment
         _ = ObjectPath((self._segment,))  # check the segment early
+        self._aliases: set[ObjectPath] = set()
         self._server: _ServerType | None = server
+        self._ua_node: Node | None = None
         if parent is not None:
             self.parent = parent  # via setter to allow optional runtime type checking
-        self._ua_node: Node | None = None
         self._logger: structlog.BoundLogger = structlog.get_logger(f"opensmi.{self.__class__.__name__}", name=self.name)
 
         super().__init__(**kwargs)  # cooperative __init__() after we are done
@@ -107,6 +108,51 @@ class BaseUaObject(Generic[_ServerType]):
         return base / self._segment
 
     @property
+    def aliases(self) -> frozenset[ObjectPath]:
+        """Further paths of this object, e.g. of a variable also listed in other containers; ``path`` is canonical."""
+        return frozenset(self._aliases)
+
+    def _add_alias(self, path: ObjectPath) -> None:
+        """Add ``path`` as a further path of this object; ``server.resolve()`` finds it once the object has a node."""
+        self._aliases.add(path)
+        if self._ua_node is not None:
+            self.server._register_path(path, self)  # noqa: SLF001
+
+    def resolve(self, relative: str) -> "BaseUaObject[_ServerType]":
+        """Return the object at ``relative`` below this one, e.g. ``"Components/Gripper"``.
+
+        :raises KeyError: If no object has this path.
+        :raises ValueError: If ``relative`` starts with ``/`` or is no valid relative path.
+        """
+        return self.server.resolve(self._absolute(relative))
+
+    def resolve_optional(self, relative: str) -> "BaseUaObject[_ServerType] | None":
+        """Return the object at ``relative`` below this one, or ``None``.
+
+        :raises ValueError: If ``relative`` starts with ``/`` or is no valid relative path.
+        """
+        return self.server.resolve_optional(self._absolute(relative))
+
+    def find(self, pattern: str) -> "list[BaseUaObject[_ServerType]]":
+        """Return all objects below this one whose path matches the relative glob ``pattern``, e.g. ``"**/SkillSet/*"``.
+
+        :raises ValueError: If ``pattern`` starts with ``/`` or is no valid pattern.
+        """
+        self._check_relative(pattern)
+        prefix = "".join(f"/{ObjectPath.escape(segment)}" for segment in self.path.segments)
+        return [found for found in self.server.find(f"{prefix}/{pattern}") if found is not self]
+
+    def _absolute(self, relative: str) -> ObjectPath:
+        self._check_relative(relative)
+        return ObjectPath((*self.path.segments, *relative.split("/")))
+
+    @staticmethod
+    def _check_relative(relative: str) -> None:
+        if relative.startswith("/"):
+            msg = f"Expected a path relative to this object, got an absolute one: {relative!r}"
+            raise ValueError(msg)
+
+    @property
     def logger(self) -> BoundLogger:
         """Logger associated with the `UaObject` instance."""
         return self._logger  # type: ignore
@@ -120,6 +166,16 @@ class BaseUaObject(Generic[_ServerType]):
     def parent(self, parent: "BaseUaObject[_ServerType]") -> None:
         """Set the parent of the UA object. Given ``parent`` must be an instance of `BaseUaObject`."""
         assert isinstance(parent, BaseUaObject)
+        self._set_parent(parent)
+
+    def _set_parent(self, parent: "BaseUaObject[_ServerType]") -> None:
+        """Set the parent; subclasses overriding the ``parent`` setter call this instead of setting ``_parent``.
+
+        :raises RuntimeError: If the object already has a node: its path is registered and must not change.
+        """
+        if self._ua_node is not None:
+            msg = f"Cannot change the parent of {self!r}: its path {self.path} is already registered"
+            raise RuntimeError(msg)
         self._parent = parent
 
     # TODO
