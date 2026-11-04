@@ -176,7 +176,7 @@ def sanitize_segment(browse_name: str) -> str:
     return browse_name.replace(_SEPARATOR, _REPLACEMENT) or _REPLACEMENT
 
 
-def _node_id_order(node_id: NodeIdDefinition) -> tuple[str, int, int, str]:
+def node_id_order(node_id: NodeIdDefinition) -> tuple[str, int, int, str]:
     """Sort key independent of the server's namespace indexes: namespace URI, OPC UA identifier type, identifier."""
     identifier = node_id.identifier
     if isinstance(identifier, int):
@@ -196,7 +196,7 @@ def unique_segments(siblings: Iterable[tuple[NodeIdDefinition, str]]) -> dict[No
     segment never takes the unchanged segment of another sibling. Sanitized and suffixed segments are logged as
     warnings.
     """
-    ordered = sorted(siblings, key=lambda sibling: _node_id_order(sibling[0]))
+    ordered = sorted(siblings, key=lambda sibling: node_id_order(sibling[0]))
     sanitized = [(node_id, name, sanitize_segment(name)) for node_id, name in ordered]
     reserved = {segment for _, _, segment in sanitized}
 

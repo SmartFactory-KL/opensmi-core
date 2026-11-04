@@ -38,7 +38,8 @@ class BaseUaObject(Generic[_ServerType]):
     ) -> None:
         """*Cooperative* constructor.
 
-        :param name: The name of the UA object. Defaults to the class name.
+        :param name: The name of the UA object, as on the server (may be empty on servers we don't control; the
+            segment never is). Defaults to the class name.
         :param segment: The last segment of the object's path. Defaults to the sanitized ``name``; clients pass the
             unique segment from ``opensmi.core.paths.unique_segments()``.
         :param server: The associated server of the UA object. Note that there must be at least one non ``None`` in
@@ -48,7 +49,7 @@ class BaseUaObject(Generic[_ServerType]):
         """
         if name is None:
             name = self.__class__.__name__
-        elif not isinstance(name, str) or name == "":
+        elif not isinstance(name, str):
             msg = f"Given name '{name}' is not valid!"
             raise TypeError(msg)
 

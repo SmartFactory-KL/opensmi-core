@@ -259,3 +259,10 @@ def test_explicit_segment():
 def test_invalid_explicit_segment_is_rejected():
     with pytest.raises(ValueError, match="segment"):
         _Component(name="Pick", segment="a/b")
+
+
+def test_empty_name_gets_placeholder_segment():
+    obj = _Component(name="", parent=_Machine(name="M1"))
+
+    assert obj.name == ""
+    assert obj.path == ObjectPath.parse("/M1/Components/_")
