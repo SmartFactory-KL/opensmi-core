@@ -21,6 +21,8 @@ class UaEvent(Protocol):
     SourceNode: ua.NodeId
     Time: datetime
     emitting_node: ua.NodeId
+    server_handle: int | None
+    """Handle of the monitored item that delivered the event (set by asyncua's client subscription)."""
 
 
 class NamespaceProvider(Protocol):

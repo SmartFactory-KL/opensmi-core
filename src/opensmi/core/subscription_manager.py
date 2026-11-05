@@ -456,9 +456,15 @@ class SubscriptionManager:
         """Handle OPC UA event notifications callback."""
         self._last_heartbeat = time.monotonic()
 
-        # TODO(CaHa): ua_event.emitting_node is always i=2253 (=Server)
-        # might be an asyncua problem
-        item = self._event_subscription_map.get(ua_event.SourceNode)
+        # Route by the monitored item, not by the event: asyncua leaves ua_event.emitting_node at i=2253 (=Server),
+        # see https://github.com/FreeOpcUa/opcua-asyncio/issues/2074, and SourceNode is the object the event is
+        # about, which need not be the subscribed node.
+        item = None
+        if ua_event.server_handle is not None:
+            item = next(
+                (item for item in self._event_subscription_map.values() if item.handle == ua_event.server_handle),
+                None,
+            )
         if item is None:
             self.logger.warning("Received Event Notification with no handlers", ua_event=ua_event)
             return
