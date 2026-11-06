@@ -11,6 +11,8 @@ from .enums import LifecycleState as LifecycleState
 from .lifecycle_mixin import LifecycleMixin as LifecycleMixin
 from .lifecycle_mixin import lifecycle as lifecycle
 from .logging import LogFormat as LogFormat
+from .logging import console_formatter as console_formatter
+from .logging import json_formatter as json_formatter
 from .logging import setup_logging as setup_logging
 from .paths import ObjectPath as ObjectPath
 from .signal import Signal as Signal
