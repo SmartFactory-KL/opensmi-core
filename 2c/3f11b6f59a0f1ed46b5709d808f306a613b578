@@ -1,0 +1,23 @@
+src/opensmi/core/subscription_manager.py
+  s_80045bbad50cec::t_dbdefaae723d9e 120-121,208-210,275,375
+  s_80045bbad50cec::t_23f452d55b3e52 21,49-53,105-106,122-126,128-131,242-244,246,248-249,414,425,433-457,504-507
+tests/test_subscription_manager_reconnect.py
+  s_80045bbad50cec::t_5b7c095d90e27f 1-22,24-127,132-134
+  s_80045bbad50cec::t_a7d7a11b03a289 23,128-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c3f11b6f59a0f1ed46b5709d808f306a613b578",
+  "prompts": {},
+  "sessions": {
+    "s_80045bbad50cec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad00b376-31f3-4e21-a5f9-eae035b03d40",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
