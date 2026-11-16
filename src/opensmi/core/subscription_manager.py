@@ -18,7 +18,7 @@ from asyncua import ua
 from asyncua.client.client import Client
 from asyncua.common.events import get_filter_from_event_type
 from asyncua.common.node import Node
-from asyncua.common.subscription import DataChangeNotif, Subscription
+from asyncua.common.subscription import DataChangeNotif, Subscription, SubscriptionItemData
 from asyncua.ua import NodeId, UaStatusCodeError
 
 from opensmi.core.protocols import UaEvent
@@ -46,7 +46,11 @@ _HandlerType = TypeVar("_HandlerType")
 @dataclass
 class _MonitoredItem(Generic[_HandlerType]):
     handle: int | None
-    """Handle as returned by ``asyncua``. Is ``None`` when renew failed."""
+    """Monitored item ID as returned by ``asyncua``. Is ``None`` when renew failed.
+
+    Goes stale when asyncua recreates the subscription on auto-reconnect, see
+    :meth:`SubscriptionManager._refresh_handles`.
+    """
     handlers: list[_HandlerType] = field(default_factory=list)
     """List of handler that are subscribed to the monitored item. Shall not contain duplicates."""
 
@@ -78,7 +82,6 @@ class SubscriptionManager:
     """
 
     _ua_client: Client
-    _ua_subscription: Subscription
 
     def __init__(
         self,
@@ -99,6 +102,8 @@ class SubscriptionManager:
         """
         self._publishing_interval_ms = publishing_interval_ms
         self._ua_client = ua_client
+        self._ua_subscription: Subscription | None = None
+        """``None`` before :meth:`init`, after :meth:`shutdown` and while renewing."""
 
         self._data_subscription_map: dict[NodeId, _MonitoredItem[UaDataChangeSubscriber]] = {}
         """ Maps a OPC UA node to a handle and a list of handlers for data change notifications. """
@@ -112,12 +117,18 @@ class SubscriptionManager:
 
         self.logger = structlog.getLogger("opensmi.SubscriptionManager")
 
+    def _require_subscription(self) -> Subscription:
+        """Return the OPC UA subscription or raise ``ConnectionError`` if there is none."""
+        if self._ua_subscription is None:
+            msg = "No OPC UA subscription: not initialized, shut down or being renewed"
+            raise ConnectionError(msg)
+        return self._ua_subscription
+
     async def _create_subscription(self) -> None:
-        self._ua_subscription = await self._ua_client.create_subscription(
-            period=self._publishing_interval_ms, handler=self
-        )
-        self.logger.info("Created subscription!", parameters=self._ua_subscription.parameters)
-        actual = self._ua_subscription.parameters.RequestedPublishingInterval
+        subscription = await self._ua_client.create_subscription(period=self._publishing_interval_ms, handler=self)
+        self._ua_subscription = subscription
+        self.logger.info("Created subscription!", parameters=subscription.parameters)
+        actual = subscription.parameters.RequestedPublishingInterval
         if actual != self._publishing_interval_ms:
             self.logger.warning(
                 "Requested publishing interval was revised!", requested=self._publishing_interval_ms, actual=actual
@@ -194,7 +205,9 @@ class SubscriptionManager:
     async def _renew_event_subscriptions(self) -> None:
         for node_id, monitored_item in list(self._event_subscription_map.items()):
             try:
-                handle = await self._ua_subscription.subscribe_events(node_id, evfilter=monitored_item.event_filter)
+                handle = await self._require_subscription().subscribe_events(
+                    node_id, evfilter=monitored_item.event_filter
+                )
                 monitored_item.handle = handle
             except UaStatusCodeError as err:
                 monitored_item.handle = None
@@ -226,15 +239,16 @@ class SubscriptionManager:
     async def _delete_subscription(self) -> None:
         """Best-effort deletion of the server-side subscription; the maps are left untouched."""
         self._invalidate_subscription_handles()
+        subscription, self._ua_subscription = self._ua_subscription, None
+        if subscription is None:
+            return
         try:
-            await self._ua_subscription.delete()
+            await subscription.delete()
             self.logger.info("Deleted main OPC UA subscription!")
-        except (ConnectionError, AttributeError):
-            pass  # connection is gone or there is no subscription to delete
+        except ConnectionError:
+            pass  # connection is gone
         except Exception as err:
             self.logger.exception("Could not delete main OPC UA subscription!", reason=err)
-        with contextlib.suppress(NameError, AttributeError):
-            del self._ua_subscription
 
     async def clear_subscriptions(self) -> None:
         """Delete the OPC UA subscription and forget all registered handlers."""
@@ -258,7 +272,7 @@ class SubscriptionManager:
         for i in range(0, len(nodes), size):
             batch = nodes[i : i + size]
             self.logger.debug("Subscribing to data changes", count=len(batch))
-            results.extend(await self._ua_subscription.subscribe_data_change(batch))
+            results.extend(await self._require_subscription().subscribe_data_change(batch))
         return results
 
     def _collect_wanted(
@@ -358,7 +372,7 @@ class SubscriptionManager:
                 for t in (ua.NodeId(ua.Int32(ua.object_ids.ObjectIds.BaseEventType)), *event_types)
             ]
             event_filter = await get_filter_from_event_type(types)
-            handle = await self._ua_subscription.subscribe_events(
+            handle = await self._require_subscription().subscribe_events(
                 sourcenode=source_node,
                 evfilter=event_filter,
             )
@@ -397,6 +411,7 @@ class SubscriptionManager:
         node_id: NodeId,
         subscription_map: dict[NodeId, _MonitoredItem[_HandlerType]],
     ) -> None:
+        self._refresh_handles()
         item = subscription_map.get(node_id)
         if item is None or handler not in item.handlers:
             return  # nothing to do
@@ -407,13 +422,38 @@ class SubscriptionManager:
             return  # other handlers still need the monitored item
 
         del subscription_map[node_id]
-        if item.handle is None:
+        if item.handle is None or self._ua_subscription is None:
             return  # nothing to unsubscribe
 
         try:
             await self._ua_subscription.unsubscribe(item.handle)
         except (UaStatusCodeError, ConnectionError) as err:
             self.logger.warning("Could not delete monitored item", node=node_id.to_string(), reason=err)
+
+    def _refresh_handles(self) -> None:
+        """Take over the monitored item IDs asyncua currently knows.
+
+        When the server lost the session, asyncua recreates the subscription on auto-reconnect and the server assigns
+        new monitored item IDs.
+        """
+        if self._ua_subscription is None:
+            return
+        # asyncua has no public API for the recreated IDs; covered by the reconnect test
+        ua_items: dict[int, SubscriptionItemData] = self._ua_subscription._monitored_items  # noqa: SLF001
+        for ua_item in ua_items.values():
+            if ua_item.node is None or ua_item.server_handle is None:
+                continue
+            if ua_item.attribute == ua.attribute_ids.AttributeIds.Value:
+                item = self._data_subscription_map.get(ua_item.node.nodeid)
+            elif ua_item.attribute == ua.attribute_ids.AttributeIds.EventNotifier:
+                item = self._event_subscription_map.get(ua_item.node.nodeid)
+            else:
+                continue
+            if item is not None:
+                item.handle = ua_item.server_handle
+
+    def _find_event_item(self, handle: int) -> _MonitoredEventItem | None:
+        return next((item for item in self._event_subscription_map.values() if item.handle == handle), None)
 
     async def _heartbeat_loop(self) -> Never:
         while True:
@@ -461,10 +501,10 @@ class SubscriptionManager:
         # about, which need not be the subscribed node.
         item = None
         if ua_event.server_handle is not None:
-            item = next(
-                (item for item in self._event_subscription_map.values() if item.handle == ua_event.server_handle),
-                None,
-            )
+            item = self._find_event_item(ua_event.server_handle)
+            if item is None:  # asyncua may have recreated the subscription with new monitored item IDs
+                self._refresh_handles()
+                item = self._find_event_item(ua_event.server_handle)
         if item is None:
             self.logger.warning("Received Event Notification with no handlers", ua_event=ua_event)
             return
