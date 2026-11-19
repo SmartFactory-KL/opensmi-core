@@ -1,0 +1,21 @@
+src/opensmi/core/nodesets/DEVIATIONS.md
+  s_046f4fd4e4eb85::t_cb5a533d1ea914 1-17
+src/opensmi/core/nodesets/Opc.Ua.SmartFactory.MachineSet.NodeSet2.xml
+  s_046f4fd4e4eb85::t_30327b900ad657 1216,1292,1324-1325,1353,1397,1673
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7bb3bd770019fbc888d9e3c3e114992c0996aa03",
+  "prompts": {},
+  "sessions": {
+    "s_046f4fd4e4eb85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8916ebf-ea90-4b68-b5b1-f0faa8b48590",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
