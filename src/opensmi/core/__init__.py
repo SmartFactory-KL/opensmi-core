@@ -16,6 +16,7 @@ from .logging import json_formatter as json_formatter
 from .logging import setup_logging as setup_logging
 from .paths import ObjectPath as ObjectPath
 from .signal import Signal as Signal
+from .skill_state_machine import SkillCommand as SkillCommand
 from .ua import OPC_UA_NS as OPC_UA_NS
 from .ua import LocalizedText as LocalizedText
 from .ua import NodeIdDefinition as NodeIdDefinition
