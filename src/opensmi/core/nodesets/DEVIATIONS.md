@@ -1,11 +1,11 @@
 # Deviations from the upstream nodesets
 
-Changes in our copies of the NodeSet2 XML files that the nodeset owner has not (yet) adopted. Each one is proposed
-upstream; remove its entry once an upstream release contains it.
+Changes in our copies of the NodeSet2 XML files that are not yet in an upstream release. Each one is agreed with the
+nodeset owner; remove its entry once an upstream release contains it.
 
 ## Opc.Ua.SmartFactory.MachineSet.NodeSet2.xml
 
-Proposed upstream as `opensmi-issues skill-state-machine/02`.
+Agreed upstream (`opensmi-issues skill-state-machine/02`), not yet released.
 
 | Node | Change |
 |---|---|

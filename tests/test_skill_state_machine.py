@@ -118,6 +118,15 @@ def test_transitions_from() -> None:
     }
 
 
+@pytest.mark.parametrize("finite", [True, False], ids=["finite", "continuous"])
+def test_suspending_leads_only_to_suspended_or_halting(finite: bool) -> None:
+    # as in PackML, a skill completes only from Running, never out of a suspend
+    assert {(t.target, t.cause) for t in transitions_from(S.SUSPENDING, finite=finite)} == {
+        (S.SUSPENDED, None),
+        (S.HALTING, C.HALT),
+    }
+
+
 _ALLOWED_FINITE: dict[SkillState, set[SkillCommand]] = {
     S.HALTED: {C.RESET},
     S.RESETTING: {C.HALT},
