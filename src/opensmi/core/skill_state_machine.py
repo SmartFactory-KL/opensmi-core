@@ -5,7 +5,8 @@
 """The skill state machine as specified by ``SkillStateMachineType`` in the MachineSet nodeset.
 
 Finite and continuous skills share one state machine type. Continuous skills never complete, so they use it without
-the transitions from or to `SkillState.COMPLETING` and `SkillState.COMPLETED`.
+the transitions from or to `SkillState.COMPLETING` and `SkillState.COMPLETED`. Skills that cannot be suspended have no
+Suspend method, so they use it without the transitions from or to `SkillState.SUSPENDING` and `SkillState.SUSPENDED`.
 
 A transition without a cause is an *internal* transition: the server takes it on its own and no skill command
 triggers it. A transition with a cause may still be taken by the server on its own, e.g. halting on a failure.
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache
 from typing import Final
 
 from opensmi.core.nodesets.skill_state_machine import SKILL_STATE_MACHINE_TYPE as _TYPE
@@ -62,8 +64,9 @@ class SkillTransition:
     """NodeId of the transition in ``SkillStateMachineType``, as in ``LastTransition/Id``."""
 
 
-_FINITE_ONLY: Final[frozenset[SkillState]] = frozenset({SkillState.COMPLETING, SkillState.COMPLETED})
-_FINITE: Final[tuple[SkillTransition, ...]] = tuple(
+_COMPLETION: Final[frozenset[SkillState]] = frozenset({SkillState.COMPLETING, SkillState.COMPLETED})
+_SUSPENSION: Final[frozenset[SkillState]] = frozenset({SkillState.SUSPENDING, SkillState.SUSPENDED})
+_TYPE_TRANSITIONS: Final[tuple[SkillTransition, ...]] = tuple(
     SkillTransition(
         name=transition.name,
         source=_STATES_BY_NAME[transition.source],
@@ -73,34 +76,41 @@ _FINITE: Final[tuple[SkillTransition, ...]] = tuple(
     )
     for transition in _TYPE.transitions
 )
-_CONTINUOUS: Final[tuple[SkillTransition, ...]] = tuple(
-    t for t in _FINITE if t.source not in _FINITE_ONLY and t.target not in _FINITE_ONLY
-)
+
 _STATES_BY_ID: Final[dict[NodeIdDefinition, SkillState]] = {
     node_id: _STATES_BY_NAME[name] for name, node_id in _STATE_IDS.items()
 }
 
 
-def transitions(*, finite: bool) -> tuple[SkillTransition, ...]:
-    """Return all transitions of a finite or a continuous skill."""
-    return _FINITE if finite else _CONTINUOUS
+@cache
+def transitions(*, finite: bool, suspendable: bool) -> tuple[SkillTransition, ...]:
+    """Return all transitions of a skill.
+
+    :param finite: whether the skill is finite or continuous.
+    :param suspendable: whether the skill can be suspended.
+    """
+    excluded: set[SkillState] = set()
+    if not finite:
+        excluded |= _COMPLETION
+    if not suspendable:
+        excluded |= _SUSPENSION
+    return tuple(t for t in _TYPE_TRANSITIONS if not {t.source, t.target} & excluded)
 
 
-def transitions_from(state: SkillState, *, finite: bool) -> tuple[SkillTransition, ...]:
-    """Return the transitions leaving ``state`` for a finite or a continuous skill."""
-    return tuple(t for t in transitions(finite=finite) if t.source == state)
+def states(*, finite: bool, suspendable: bool) -> tuple[SkillState, ...]:
+    """Return the states a skill can be in, in `SkillState` order, see `transitions()`."""
+    present = {s for t in transitions(finite=finite, suspendable=suspendable) for s in (t.source, t.target)}
+    return tuple(s for s in SkillState if s in present)
 
 
 def allowed_commands(state: SkillState, *, finite: bool, suspendable: bool) -> frozenset[SkillCommand]:
     """Return the commands a skill in ``state`` accepts.
 
     :param finite: whether the skill is finite or continuous.
-    :param suspendable: whether the skill can be suspended; a skill that cannot has no Suspend method.
+    :param suspendable: whether the skill can be suspended.
     """
-    commands = {t.cause for t in transitions_from(state, finite=finite) if t.cause is not None}
-    if not suspendable:
-        commands.discard(SkillCommand.SUSPEND)
-    return frozenset(commands)
+    skill_transitions = transitions(finite=finite, suspendable=suspendable)
+    return frozenset(t.cause for t in skill_transitions if t.source == state and t.cause is not None)
 
 
 def state_node_id(state: SkillState) -> NodeIdDefinition:
