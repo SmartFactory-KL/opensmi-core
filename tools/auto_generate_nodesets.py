@@ -12,7 +12,6 @@ Reads every ``*.NodeSet2.xml`` in the nodeset directory and writes one module pe
 import argparse
 import logging
 import re
-import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -22,13 +21,13 @@ from pprint import pformat
 from string import Template
 from typing import Final
 
+from _nodeset_xml import OPC_UA_URI, check
 from asyncua.ua import NodeId
 
 TOOLS_PATH: Final[Path] = Path(__file__).resolve().parent
 NODESET_PATH: Final[Path] = TOOLS_PATH.parent / "src" / "opensmi" / "core" / "nodesets"
 TEMPLATE: Final[Template] = Template((TOOLS_PATH / "nodeset.py.template").read_text(encoding="utf-8"))
 TYPE_TAGS: Final[set[str]] = {"UAObjectType", "UADataType", "UAVariableType"}
-OPC_UA_URI: Final[str] = "http://opcfoundation.org/UA/"
 
 logging.basicConfig(level=logging.INFO)
 _LOGGER = logging.getLogger(__name__)
@@ -110,15 +109,7 @@ def _write__init__(files: list[_ProcessModelEntry], out_path: Path) -> None:
             file.write(f'    "{entry.uri}": {entry.class_name},\n')
         file.write("}\n")
 
-    _check(path)
-
-
-def _check(path: Path) -> None:
-    subprocess.run([sys.executable, "-m", "ruff", "check", "--fix", str(path)], check=True)
-    subprocess.run([sys.executable, "-m", "ruff", "format", str(path)], check=True)
-
-    # finally, make sure the file is valid python after formatting & linting
-    compile(path.read_text(encoding="utf-8"), path, "exec")
+    check(path)
 
 
 def _process_model(node: ET.Element) -> _ModelEntry:
@@ -211,7 +202,7 @@ def main() -> None:  # noqa: D103
         )
 
         # format and lint generated file, check for errors
-        _check(dest_path)
+        check(dest_path)
 
     _write__init__(files, out_path)
 
