@@ -1213,6 +1213,7 @@
         <DisplayName>HaltedToResetting</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
+            <Reference ReferenceType="HasCause">ns=5;i=7015</Reference>
             <Reference ReferenceType="ToState">ns=5;i=5124</Reference>
             <Reference ReferenceType="FromState">ns=5;i=5114</Reference>
             <Reference ReferenceType="HasProperty">ns=5;i=6155</Reference>
@@ -1288,6 +1289,7 @@
         <DisplayName>ResettingToHalting</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
+            <Reference ReferenceType="HasCause">ns=5;i=7014</Reference>
             <Reference ReferenceType="FromState">ns=5;i=5124</Reference>
             <Reference ReferenceType="ToState">ns=5;i=5117</Reference>
             <Reference ReferenceType="HasProperty">ns=5;i=6168</Reference>
@@ -1319,8 +1321,8 @@
             <Reference ReferenceType="HasProperty">ns=5;i=6171</Reference>
         </References>
     </UAObject>
-    <UAObject NodeId="ns=5;i=5132" BrowseName="5:RunningToSuspeneding" ParentNodeId="ns=5;i=1014">
-        <DisplayName>RunningToSuspeneding</DisplayName>
+    <UAObject NodeId="ns=5;i=5132" BrowseName="5:RunningToSuspending" ParentNodeId="ns=5;i=1014">
+        <DisplayName>RunningToSuspending</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
             <Reference ReferenceType="HasCause">ns=5;i=7017</Reference>
@@ -1348,6 +1350,7 @@
         <DisplayName>StartingToHalting</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
+            <Reference ReferenceType="HasCause">ns=5;i=7014</Reference>
             <Reference ReferenceType="FromState">ns=5;i=5133</Reference>
             <Reference ReferenceType="ToState">ns=5;i=5117</Reference>
             <Reference ReferenceType="HasProperty">ns=5;i=6179</Reference>
@@ -1391,6 +1394,7 @@
         <DisplayName>SuspendingToHalting</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
+            <Reference ReferenceType="HasCause">ns=5;i=7014</Reference>
             <Reference ReferenceType="FromState">ns=5;i=5151</Reference>
             <Reference ReferenceType="ToState">ns=5;i=5117</Reference>
             <Reference ReferenceType="HasProperty">ns=5;i=6191</Reference>
@@ -1666,6 +1670,7 @@
         <DisplayName>CompletingToHalting</DisplayName>
         <References>
             <Reference ReferenceType="HasTypeDefinition">i=2310</Reference>
+            <Reference ReferenceType="HasCause">ns=5;i=7014</Reference>
             <Reference ReferenceType="FromState">ns=5;i=5147</Reference>
             <Reference ReferenceType="ToState">ns=5;i=5117</Reference>
             <Reference ReferenceType="HasProperty">ns=5;i=6195</Reference>
