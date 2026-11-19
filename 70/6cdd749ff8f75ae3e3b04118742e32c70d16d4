@@ -1,0 +1,20 @@
+.github/workflows/checks.yml
+  s_046f4fd4e4eb85::t_9386a50caabb9b 40-61,68
+  s_046f4fd4e4eb85::t_4db4ff6c735c86 62-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "706cdd749ff8f75ae3e3b04118742e32c70d16d4",
+  "prompts": {},
+  "sessions": {
+    "s_046f4fd4e4eb85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8916ebf-ea90-4b68-b5b1-f0faa8b48590",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
