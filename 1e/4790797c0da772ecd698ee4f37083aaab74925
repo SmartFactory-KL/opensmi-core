@@ -1,0 +1,14 @@
+src/opensmi/core/nodesets/Opc.Ua.SmartFactory.MachineSet.NodeSet2.xml
+  h_3a91ce8773dd89 1216,1692
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e4790797c0da772ecd698ee4f37083aaab74925",
+  "prompts": {},
+  "humans": {
+    "h_3a91ce8773dd89": {
+      "author": "Carsten Harms <Carsten.Harms@dfki.de>"
+    }
+  }
+}
