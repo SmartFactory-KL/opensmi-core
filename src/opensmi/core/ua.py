@@ -57,3 +57,48 @@ class LocalizedText:
     def to_ua(self) -> ua.LocalizedText:
         """Convert to asyncua."""
         return ua.LocalizedText(Text=self.text, Locale=self.locale or None)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StateDefinition:
+    """Frozen definition of a state in an OPC UA state machine type."""
+
+    name: str
+    """Browse name of the state, without namespace."""
+    number: int
+    """Value of the state's ``StateNumber`` property."""
+    node_id: NodeIdDefinition
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TransitionDefinition:
+    """Frozen definition of a transition in an OPC UA state machine type."""
+
+    name: str
+    """Browse name of the transition, without namespace."""
+    source: str
+    """Name of the ``FromState``."""
+    target: str
+    """Name of the ``ToState``."""
+    cause: str | None
+    """Name of the method referenced by ``HasCause``, or ``None`` if the transition has no cause."""
+    node_id: NodeIdDefinition
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MethodDefinition:
+    """Frozen definition of a method declared in an OPC UA state machine type."""
+
+    name: str
+    """Browse name of the method, without namespace."""
+    node_id: NodeIdDefinition
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StateMachineTypeDefinition:
+    """Frozen definition of an OPC UA state machine type: its states, transitions and methods."""
+
+    type_id: NodeIdDefinition
+    states: tuple[StateDefinition, ...]
+    transitions: tuple[TransitionDefinition, ...]
+    methods: tuple[MethodDefinition, ...]
