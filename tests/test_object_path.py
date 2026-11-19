@@ -13,7 +13,7 @@ import pytest
 
 from opensmi.core import ObjectPath
 from opensmi.core.base_ua_object import BaseUaObject
-from opensmi.core.paths import check_name, check_segment
+from opensmi.core.paths import check_name, check_segment, to_pascal_case
 
 SKILL = ObjectPath(("M1", "Components", "Gripper", "SkillSet", "Pick"))
 
@@ -198,6 +198,21 @@ def test_valid_names(name):
 def test_invalid_names(name):
     with pytest.raises(ValueError, match="Name"):
         check_name(name)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("child_frame_id", "ChildFrameId"),
+        ("max_vel_x", "MaxVelX"),
+        ("pose2d", "Pose2d"),
+        ("linear_X", "LinearX"),  # only the first letter of a part changes
+        ("_private__name_", "PrivateName"),
+        ("none", "None"),  # not checked: still breaks the naming rule
+    ],
+)
+def test_to_pascal_case(name, expected):
+    assert to_pascal_case(name) == expected
 
 
 @pytest.mark.parametrize("name", ["operator", "j.doe", "Max Mustermann", "user@example.com", "True", "*"])

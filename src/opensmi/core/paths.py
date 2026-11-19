@@ -159,7 +159,12 @@ def check_name(name: str) -> None:
 
     Browse names of machines, components, resources, skills, checks, methods and variables match
     ``^[A-Z][A-Za-z0-9]*$`` and aren't ``True``, ``False`` or ``None``, so they are valid identifiers in common
-    languages. Not enforced yet: opensmi-server warns and rejects from 1.0 on. Usernames are exempt.
+    languages. Not enforced yet: opensmi-server warns and rejects from 1.0 on.
+
+    Two kinds of names are exempt and only need to pass ``check_segment()``: usernames, and instances named from
+    runtime data rather than the model (e.g. one object per diagnostic id or TF frame), which code generation never
+    sees. DataType browse names are outside the rule. Foreign names such as ROS2's snake_case convert with
+    ``to_pascal_case()``.
 
     :raises ValueError: If ``name`` breaks the rule.
     """
@@ -169,6 +174,17 @@ def check_name(name: str) -> None:
     if name in _RESERVED_NAMES:
         msg = f"Name must not be one of {sorted(_RESERVED_NAMES)}: {name!r}"
         raise ValueError(msg)
+
+
+def to_pascal_case(name: str) -> str:
+    """Convert a snake_case name to PascalCase: split on ``_``, capitalize each part, join.
+
+    Only the first letter of a part changes, the rest stays as is: ``child_frame_id`` → ``ChildFrameId``,
+    ``max_vel_x`` → ``MaxVelX``, ``pose2d`` → ``Pose2d``. Empty parts (``__``, leading or trailing ``_``) vanish. The
+    result is not checked, so pass it to ``check_name()``: ``none`` becomes the reserved ``None``, ``2d_pose`` becomes
+    ``2dPose``, and two names may convert to the same one (``x_1`` and ``x1``).
+    """
+    return "".join(part[:1].upper() + part[1:] for part in name.split(_REPLACEMENT))
 
 
 def sanitize_segment(browse_name: str) -> str:
