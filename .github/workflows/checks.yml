@@ -37,6 +37,35 @@ jobs:
       - name: basedpyright
         run: uv run basedpyright
 
+  generated:
+    name: Generated nodeset modules are up to date
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Regenerate
+        run: |
+          uv run python tools/auto_generate_nodesets.py
+          uv run python tools/auto_generate_state_machines.py
+
+      - name: Check for changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Generated modules are out of date, run the generators in tools/ and commit the result."
+            git status --short
+            git diff
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     strategy:
